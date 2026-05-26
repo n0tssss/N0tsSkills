@@ -1,0 +1,49 @@
+# N0tsSkills
+
+个人自用 AI 技能（Skills）集合。
+
+## 内容
+
+| 技能 | 说明 |
+|------|------|
+| `short-video-gen/` | 短视频生成 — 通用短视频工具，支持 10 种视觉风格 + 3 种文案风格，一键生成 4:3 横屏 + 3:4 竖屏视频 |
+
+## 安装
+
+### 一键安装（推荐）
+
+直接告诉 AI：
+
+> "请把 https://github.com/n0tssss/N0tsSkills.git 克隆到 ~/.claude/skills/ 目录下"
+
+AI 会自动：
+1. 克隆仓库到 skills 目录
+2. 识别并加载所有技能
+3. 以后 `git pull` 即可同步最新
+
+### 手动安装
+
+```bash
+git clone https://github.com/n0tssss/N0tsSkills.git ~/.claude/skills/
+```
+
+### 同步更新
+
+```bash
+cd ~/.claude/skills/ && git pull
+```
+
+## 添加新技能
+
+把新技能的文件夹放入仓库根目录，推送到 GitHub 即可。
+
+每个技能目录结构：
+```
+skill-name/
+  SKILL.md      # 技能定义（必需）
+  README.md     # 技能说明（可选）
+```
+
+## License
+
+MIT
