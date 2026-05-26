@@ -116,7 +116,41 @@ D:\视频生成\
 
 如果用户说"今日 GitHub 热门工具"之类，则去 `https://github.com/trending` 找，跳过 `.history.json` 中已做过的。
 
-### Step 2: 收集素材
+### Step 2: 实地调研（网站/产品类视频必须做）
+
+**如果视频涉及网站、Web 产品或在线服务，必须先使用 kimi-webbridge 浏览器工具实地访问，不能靠搜索推测。**
+
+```bash
+# 1. 健康检查
+~/.kimi-webbridge/bin/kimi-webbridge status
+
+# 2. 打开目标网站（新标签页）
+curl -s -X POST http://127.0.0.1:10086/command \
+  -d '{"action":"navigate","args":{"url":"https://目标网站","newTab":true},"session":"research"}'
+
+# 3. 获取页面结构
+curl -s -X POST http://127.0.0.1:10086/command \
+  -d '{"action":"snapshot","args":{},"session":"research"}'
+
+# 4. 截图保存（用于后续视频素材）
+curl -s -X POST http://127.0.0.1:10086/command \
+  -d '{"action":"screenshot","args":{"format":"jpeg","quality":70,"path":"D:/视频生成/<name>/screenshot.jpg"},"session":"research"}'
+
+# 5. 必须点击探索的关键元素：
+#    - 登录/注册按钮 → 看登录流程（手机号？微信？邮箱？）
+#    - 核心功能页面（如热榜、搜索、分类）
+#    - 定价/套餐页面（如果有）
+#    - 关于/介绍页面
+```
+
+**调研清单**（确保视频内容准确）：
+- 实际数据（用户数、内容量等）— 以页面上显示的为准
+- 登录方式 — 实际点击登录按钮看弹窗
+- 核心功能入口 — 导航栏有哪些链接
+- Slogan/宣传语 — 页面上真实出现的文案
+- 特色功能 — 页面上高亮展示的内容
+
+### Step 3: 收集素材
 
 优先真实素材：
 1. 项目自带的截图/Demo 图/GIF → `curl` 下载
@@ -124,7 +158,7 @@ D:\视频生成\
 3. GitHub opengraph 预览图
 4. 都没有 → 纯文字排版
 
-### Step 3: 生成视频
+### Step 4: 生成视频
 
 创建 `D:\视频生成\<name>\43\` 和 `D:\视频生成\<name>\34\` 两个 HyperFrames 项目。
 
@@ -189,7 +223,7 @@ D:\视频生成\
 - 最后必须放链接地址（大字 CTA）
 - 文案动词开头，口语化，像广告不像文档
 
-### Step 4: 渲染
+### Step 5: 渲染
 
 ```bash
 export PATH="/d/software/nvm/v22.21.1:$PATH"
@@ -203,7 +237,7 @@ cp 43/renders/*.mp4 ../43-横屏.mp4
 cp 34/renders/*.mp4 ../34-竖屏.mp4
 ```
 
-### Step 5: 记录
+### Step 6: 记录
 
 在 `.history.json` 追加生成记录（含主题、时间、输出目录），避免重复。
 
