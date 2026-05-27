@@ -43,9 +43,29 @@ D:\视频生成\
                 [9] 冰川蓝 [10] 红黑警戒
 【4. 文案风格】 [1] 一句话暴力 [2] 痛点轰炸 [3] 颠覆认知
 【5. 内容侧重】 [1] 核心亮点 [2] 功能罗列
+【6. TTS 配音】 [1] 小米 MiMo TTS（需 API Key） [2] 暂不加配音
 
-回复格式：1-3, 2-1, 3-2, 4-3, 5-1
+回复格式：1-3, 2-1, 3-2, 4-3, 5-1, 6-1
 ```
+
+如果用户选了 TTS，额外询问：
+
+```
+🔑 小米 MiMo TTS 配置
+
+请提供你的 MIMO_API_KEY（在 https://platform.xiaomimimo.com 控制台获取）：
+> [等待用户输入]
+
+请选择预置语音：
+  [1] 冰糖 — 甜美女声（推荐）
+  [2] 茉莉 — 温柔女声
+  [3] 苏打 — 阳光男声
+  [4] 白桦 — 沉稳男声
+
+> [等待用户输入]
+```
+
+**安全规则**：API Key 存储在本地 `.config.json` 中，**绝不硬编码在技能文件里**，**绝不提交到 Git**。
 
 ---
 
@@ -103,19 +123,23 @@ D:\视频生成\
 
 **目标**：写一个 30 秒能让人记住的视频脚本。
 
-**脚本格式**（每行一个镜头）：
+**脚本格式**（每行一个镜头，含 TTS 信息）：
 
 ```markdown
 # 视频脚本：<主题名>
-## 时长：30s | 风格：颠覆认知 | 视觉：极简白
+## 时长：30s | 风格：颠覆认知 | 视觉：极简白 | TTS：冰糖
 
-| # | 时间 | 类型 | 画面描述 | 文字内容 | 动画方向 |
-|---|------|------|---------|---------|---------|
-| 1 | 0-3s | 砸脸 | 纯色底，最大字号居中 | "你以为你懂XX？" | 字从下弹入，0.5s后缩放微震 |
-| 2 | 3-5s | 反转 | 上一行字翻转消失，新字弹出 | "其实你没有" | 3D翻转过渡 |
-| 3 | 5-10s | 证据 | 真实截图占画面70%，上方标题 | "因为 XX 让你..." | 截图从下方滑入，标题淡入 |
-| ... | ... | ... | ... | ... | ... |
+| # | 时间 | 类型 | 画面描述 | 画面文字 | 台词（TTS） | TTS 风格 | 动画 |
+|---|------|------|---------|---------|------------|---------|------|
+| 1 | 0-3s | 砸脸 | 纯色底，大字居中 | "XXX" | "完整的口播台词" | 语速偏快，有冲击力 | 弹入+微震 |
+| 2 | ... | ... | ... | ... | ... | ... | ... |
 ```
+
+**台词规则**：
+- 每句台词独立一个 TTS 调用，对应一个 `<audio>` 轨道
+- 台词字数 × 0.3 ≈ 需要的秒数（约 3.3 字/秒语速）
+- 画面文字 ≠ 台词：画面是 punchline，台词是完整的口语表达
+- TTS 风格列描述语气、语速、情感，直接传给 MiMo API 的 user message
 
 **脚本原则**：
 - 每屏 ≤15 字（中文），≤8 词（英文）
@@ -178,7 +202,62 @@ D:\视频生成\
 
 ### Phase 4: 实现
 
-脚本和设计稿确认后，开始写 HTML。
+脚本和设计稿确认后，开始实现。
+
+#### 4.1 TTS 配音生成（如果启用）
+
+使用小米 MiMo TTS API（OpenAI 兼容接口）为脚本中每句台词生成配音。
+
+**API 参考**：
+- 端点：`https://api.xiaomimimo.com/v1/chat/completions`
+- 认证：Header `api-key: $MIMO_API_KEY`（从 `.config.json` 读取）
+- 模型：`mimo-v2.5-tts`
+- 音频：24kHz, mono, WAV 格式
+
+**调用方式**（Python，用 `openai` SDK）：
+```python
+import os, base64, json
+from openai import OpenAI
+
+config = json.load(open("D:/视频生成/.config.json"))
+client = OpenAI(
+    api_key=config["ttsApiKey"],
+    base_url="https://api.xiaomimimo.com/v1"
+)
+
+# 读取脚本中的台词列表
+script = json.load(open("D:/视频生成/<project>/台词.json"))
+
+for i, line in enumerate(script):
+    resp = client.chat.completions.create(
+        model="mimo-v2.5-tts",
+        messages=[
+            {"role": "user", "content": line.get("style", "")},
+            {"role": "assistant", "content": line["text"]}
+        ],
+        audio={"format": "wav", "voice": config["ttsVoice"]}
+    )
+    audio_b64 = resp.choices[0].message.audio.data
+    with open(f"台词-{i:02d}.wav", "wb") as f:
+        f.write(base64.b64decode(audio_b64))
+```
+
+**预置语音**：`冰糖`(甜美女声)、`茉莉`(温柔女声)、`苏打`(阳光男声)、`白桦`(沉稳男声)
+
+**风格控制**：在 user message 中传入自然语言描述，如 `"语速适中，专业稳重，像在给同事介绍工具"`
+
+**台词 JSON 格式**（`台词.json`）：
+```json
+[
+  {"text": "你的 AI 助手，真的够强吗？", "start": 0, "duration": 3.5, "style": "语速偏快，带一点挑衅感"},
+  {"text": "其实不是 AI 本身的问题。", "start": 3.5, "duration": 2.5, "style": "语气一转，变得沉稳"},
+  ...
+]
+```
+
+生成后每个台词一个 `.wav` 文件（`台词-00.wav`, `台词-01.wav` ...），在 HTML 中用独立 `<audio>` 标签引用。
+
+#### 4.2 写视频 HTML
 
 **关键实现原则**：
 
