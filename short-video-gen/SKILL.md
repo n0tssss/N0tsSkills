@@ -56,16 +56,50 @@ D:\视频生成\
 请提供你的 MIMO_API_KEY（在 https://platform.xiaomimimo.com 控制台获取）：
 > [等待用户输入]
 
+请选择语音方式：
+  [1] 预置语音 — 直接用现成的声音（推荐，最快）
+  [2] 语音设计 — 用文字描述你想要的声音（如"25岁女生，温柔但有力量感"）
+  [3] 语音克隆 — 上传一段音频，复刻那个人的声音
+
+> [等待用户输入]
+```
+
+**选 1 — 预置语音**：
+```
 请选择预置语音：
   [1] 冰糖 — 甜美女声（推荐）
   [2] 茉莉 — 温柔女声
   [3] 苏打 — 阳光男声
   [4] 白桦 — 沉稳男声
-
-> [等待用户输入]
+  [5] Mia — 英文女声
+  [6] Chloe — 英文女声
+  [7] Milo — 英文男声
+  [8] Dean — 英文男声
 ```
 
-**安全规则**：API Key 存储在本地 `.config.json` 中，**绝不硬编码在技能文件里**，**绝不提交到 Git**。
+**选 2 — 语音设计**：
+```
+请用 1-4 句话描述你想要的声音，可以参考这些维度：
+  · 性别和年龄 — "25 岁左右的女生"
+  · 音色质感 — "温暖但干脆，不带气泡音"
+  · 情绪基调 — "自信、专业，但不过于严肃"
+  · 语速节奏 — "正常语速偏快，断句利落"
+
+> [等待用户输入描述]
+```
+
+**选 3 — 语音克隆**：
+```
+请提供一段 10-30 秒的音频样本（MP3 或 WAV）：
+  · 最好是干净的人声，没有背景音乐和噪音
+  · 放在 D:\视频生成\voice-sample.mp3（或 .wav）
+  · 支持中文、英文或中英混合
+
+音频文件路径：
+> [等待用户输入路径，默认 D:\视频生成\voice-sample.mp3]
+```
+
+**安全规则**：API Key 和音频样本路径存储在本地 `.config.json` 中，**绝不硬编码在技能文件里**，**绝不提交到 Git**。
 
 ---
 
@@ -211,10 +245,11 @@ D:\视频生成\
 **API 参考**：
 - 端点：`https://api.xiaomimimo.com/v1/chat/completions`
 - 认证：Header `api-key: $MIMO_API_KEY`（从 `.config.json` 读取）
-- 模型：`mimo-v2.5-tts`
-- 音频：24kHz, mono, WAV 格式
+- 模型选择：见下方三种模式
+- 音频：24kHz, mono, WAV 格式（非流式）/ PCM16（流式）
 
-**调用方式**（Python，用 `openai` SDK）：
+**三种模式调用**（Python）：
+
 ```python
 import os, base64, json
 from openai import OpenAI
@@ -225,26 +260,63 @@ client = OpenAI(
     base_url="https://api.xiaomimimo.com/v1"
 )
 
-# 读取脚本中的台词列表
+# 读取台词列表
 script = json.load(open("D:/视频生成/<project>/台词.json"))
 
 for i, line in enumerate(script):
-    resp = client.chat.completions.create(
-        model="mimo-v2.5-tts",
-        messages=[
-            {"role": "user", "content": line.get("style", "")},
-            {"role": "assistant", "content": line["text"]}
-        ],
-        audio={"format": "wav", "voice": config["ttsVoice"]}
-    )
+    # 根据 ttsMode 选择模型和参数
+    if config["ttsMode"] == "preset":
+        # 预置语音
+        resp = client.chat.completions.create(
+            model="mimo-v2.5-tts",
+            messages=[
+                {"role": "user", "content": line.get("style", "")},
+                {"role": "assistant", "content": line["text"]}
+            ],
+            audio={"format": "wav", "voice": config["ttsVoice"]}
+        )
+    elif config["ttsMode"] == "voicedesign":
+        # 语音设计：用文字描述音色，voice 参数不需要传
+        resp = client.chat.completions.create(
+            model="mimo-v2.5-tts-voicedesign",
+            messages=[
+                {"role": "user", "content": config["ttsVoiceDesign"]},
+                {"role": "assistant", "content": line["text"]}
+            ],
+            audio={"format": "wav"}
+        )
+    elif config["ttsMode"] == "voiceclone":
+        # 语音克隆：base64 编码音频样本
+        sample_path = config["ttsCloneSample"]
+        with open(sample_path, "rb") as f:
+            sample_b64 = base64.b64encode(f.read()).decode()
+        mime = "audio/wav" if sample_path.endswith(".wav") else "audio/mpeg"
+        voice_data_url = f"data:{mime};base64,{sample_b64}"
+        
+        resp = client.chat.completions.create(
+            model="mimo-v2.5-tts-voiceclone",
+            messages=[
+                {"role": "user", "content": line.get("style", "")},
+                {"role": "assistant", "content": line["text"]}
+            ],
+            audio={"format": "wav", "voice": voice_data_url}
+        )
+    
+    # 解码并保存
     audio_b64 = resp.choices[0].message.audio.data
     with open(f"台词-{i:02d}.wav", "wb") as f:
         f.write(base64.b64decode(audio_b64))
 ```
 
-**预置语音**：`冰糖`(甜美女声)、`茉莉`(温柔女声)、`苏打`(阳光男声)、`白桦`(沉稳男声)
+**语音克隆要求**：
+- 音频 10-30 秒，干净人声，无背景音乐/噪音
+- 支持 MP3/WAV，≤10MB base64 编码后
+- 支持中文、英文或中英混合
+- 克隆后的声音可以通过 user message 进行风格控制
 
-**风格控制**：在 user message 中传入自然语言描述，如 `"语速适中，专业稳重，像在给同事介绍工具"`
+**预置语音**：`冰糖`、`茉莉`、`苏打`、`白桦`、`Mia`、`Chloe`、`Milo`、`Dean`
+
+**语音设计提示**：描述性别年龄、音色质感、情绪基调、语速节奏，1-4 句话即可。避免矛盾描述和音效词汇（如"混响"）。
 
 **台词 JSON 格式**（`台词.json`）：
 ```json
