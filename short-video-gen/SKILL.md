@@ -376,15 +376,35 @@ H0/H1/H2/H3/CTA 的字号字重用例
 
 写 HTML + CSS + GSAP。
 
-**实现检查清单**（渲染前逐项确认）：
+**实现检查清单**（渲染前逐项确认，不通过不渲染）：
 
+- [ ] **每场景都有图**：至少 80% 的场景包含 `<img>` 标签或 CSS background-image。纯文字场景最多 1 个（仅限砸脸开场）
+- [ ] 图片作为场景背景（全屏 `object-fit: cover` + 暗色蒙层），或作为内容卡片（带边框/阴影）
 - [ ] 至少 2 个场景有几何/发光/网格装饰
-- [ ] 至少 1 个场景用了非淡入淡出过渡
 - [ ] 文字设计有变化（不是全居中同字号）
-- [ ] 截图/图片有暗角或边框或 Ken Burns 效果
-- [ ] 背景不只是纯色+orb（有网格/轮廓字/几何线/点阵）
-- [ ] CTA 按钮有渐变边框或发光效果
+- [ ] CTA 按钮有发光或边框效果
 - [ ] 每屏 ≤15 字，字号 ≥28px
+
+**图片收集**（优先用 kimi-webbridge 浏览器搜图）：
+
+```bash
+# 1. 确认 kimi-webbridge 运行
+~/.kimi-webbridge/bin/kimi-webbridge status
+
+# 2. 浏览器搜索图片（Google Images 或壁纸站）
+curl -s -X POST http://127.0.0.1:10086/command \
+  -d '{"action":"navigate","args":{"url":"https://www.google.com/search?q=<关键词>+wallpaper+1920x1080&tbm=isch","newTab":true},"session":"img-search"}'
+
+# 3. 截图看搜索结果，逐个打开好的图片
+# 4. 用 evaluate 提取图片 src，curl 下载到素材/
+# 5. 或直接去 Steam 商店页拿官方封面和截图
+```
+
+**如果 kimi-webbridge 不可用**：
+- Steam 游戏：`https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/<appid>/header.jpg`
+- GitHub 仓库：`https://opengraph.githubassets.com/1/<owner>/<repo>`
+- 官网截图：`curl` 下载 favicon/logo
+- 通用备选：Google Images 直接 curl 搜索页源码提取图片 URL
 
 **超时提醒**：实现阶段如果超过 15 分钟仍未开始渲染，先输出当前 HTML 让用户看，确认后再渲染。
 
