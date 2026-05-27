@@ -1,97 +1,166 @@
 ---
 name: short-video-gen
-description: 短视频生成 — 确认基本参数后 AI 自主创意发挥
+description: 短视频生成 — 重度前期调研，丰富素材驱动，追求可商用质量
 argument-hint: "<视频主题描述>"
 level: 4
 ---
 
 # 短视频生成
 
-用户给主题，AI 做视频。唯一流程：**缺参数就问，不缺就开始**。
+**先素材，后动笔。** 不在没素材的情况下开始写 HTML。
 
 ## 工作目录
 
 ```
-D:\视频生成\
-  .config.json
-  .history.json
-  <project>/
-    index.html
-    rendered.mp4
-    素材/
+D:\视频生成\<project>/
+  素材/          # 截图、图片、Logo、BGM — 至少 6 个文件才能开始写 HTML
+  index.html
+  rendered.mp4
 ```
 
 ## 输出
 
-默认 1920×1080，用户可指定竖屏/方形/4:3 等。
+默认 1920×1080 横屏。用户可指定竖屏/方形/其他。
 
 ---
 
-## 开始前：确认基本参数
+## 开始前
 
-用户调用时，检查以下参数。缺了就用 `AskUserQuestion` 问，不缺直接开始：
+缺参数就问（`AskUserQuestion`），不缺直接开始：
 
-- **时长** — 用户没说 + 配置没有 → 问（15s / 30s / 60s / AI 判断）
-- **视觉风格** — 用户没说 + 配置没有 → 问（10 种配色方案任选）
-- **视频比例** — 用户没说 → 按默认 1920×1080，不追问
-- **BGM** — 按配置，不追问
-- **TTS** — 按配置，不追问
+- 时长（用户没说+配置没有）→ 问
+- 视觉风格（同上）→ 问
+- 比例、BGM、TTS → 按配置，不追问
 
-用户可以说"你帮我决定"跳过任何问题。
+用户说"你定"就跳过。
 
 ---
 
-## 做视频
+## 制作流程
 
-确认参数后，AI 自主完成：
+### Phase 1: 深度调研 + 素材收集
 
-1. **研究** — 网站用 kimi-webbridge 实地访问，开源仓库读 README，搜集真实数据和素材
-2. **脚本** — 确定时长、场景、每屏内容、台词
-3. **设计** — 确定配色方案和视觉方向
-4. **实现** — 写 HTML + CSS + GSAP，渲染输出
+**这是最重要的阶段。素材不够不进入 Phase 2。**
 
-所有创意决策（场景数量、布局、动画、装饰、图片使用、是否放链接）由 AI 根据题材自行判断。
+必须做的事：
 
-## 工具
+1. **网站/Web 产品** — 用 kimi-webbridge 把网站从头到尾点一遍：
+   - 首页、关于、产品/服务、价格、联系 — 每页截图
+   - 找到 logo（右键另存或截图裁切）
+   - 找到产品图/案例图/客户 Logo — 越多越好
+   - 记录页面上真实的数据和文案
 
-- **kimi-webbridge** — 浏览器实地调研网站、搜索下载图片素材
-- **HyperFrames** — HTML 渲染视频（`npx hyperframes init` / `npm run render`）
-- **FFmpeg** — 合成 BGM
-- **小米 MiMo TTS** — 配音（可选，需 API Key）
+2. **开源仓库/工具** — 读 README 找图片、Demo 截图、Logo
+   - 去项目官网截图
+   - GitHub 的 Social Preview 图直接下载
 
-## 视觉参考
+3. **游戏/影视/文化类** — 用 kimi-webbridge 去 Google Images 或壁纸站搜索下载：
+   - 官方海报/Key Art、角色图、场景截图、Logo
+   - 至少下载 5 张不同内容的图
 
-10 种配色方案可供选用，也可以自由发挥：
+**素材检查点**（进入 Phase 2 前必须确认）：
+- [ ] 素材目录下有 ≥6 个文件（图片+BGM）
+- [ ] 有至少 3 张不同内容的图（不是同一张图的不同尺寸）
+- [ ] 有 logo 或品牌标识
 
-| 风格 | 底色 | 主色 |
-|------|------|------|
-| 赛博朋克 | `#0a0a12` | 紫+青绿渐变 |
-| 极简白 | `#fafafa` | 蓝紫渐变 |
-| 暗金 | `#0c0c0c` | 金色渐变 |
-| 活力橙蓝 | `#0f0f1a` | 橙蓝渐变 |
-| 暗夜绿 | `#0a0f0a` | 绿青渐变 |
-| 霓虹粉紫 | `#0f0a14` | 粉紫渐变 |
-| 纯黑暴力 | `#000` | 纯白+红点缀 |
-| 暖橘日落 | `#1a100a` | 橙粉渐变 |
-| 冰川蓝 | `#f0f5fa` | 深蓝渐变 |
-| 红黑警戒 | `#0a0000` | 红色渐变 |
+### Phase 2: 脚本
 
-常用装饰 CSS：网格背景、对角斜线、虚线圆环、发光文字、玻璃态卡片、渐变边框、角落装饰线、轮廓字、暗角、Ken Burns。
+基于素材写脚本。每行描述：
+- 时间、场景类型、画面描述（明确指出用素材里的哪张图）
+- 画面文字、台词(TTS)、动画
 
-常用文字效果：逐字弹入、模糊reveal、clipPath reveal、text-shadow 发光。
+原则：
+- 每个场景用不同的素材图，不重复
+- 每 5-8 秒换一个场景
+- 场景类型要变化：大图铺满→卡片分列→全屏文字→左右分栏→大图铺满...
+- 前 3 秒必须抓住注意力
+- 结尾必须有行动号召或记忆点
 
-## 首次配置
+### Phase 3: 实现
 
-`.config.json` 不存在时，打印选项等用户输入：
+写 HTML + CSS + GSAP。参考以下模式自由组合：
 
+**全屏图片 + 暗色蒙层 + 大字标题** — 适合开场、章节分隔、结尾
+```css
+.full-bg { position: absolute; inset: 0; object-fit: cover; }
+.overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.55); }
 ```
-🎬 短视频生成 — 首次配置
 
-【1. 默认时长】 [0] 每次 AI 判断 [1] 15s [2] 30s [3] 60s [4] 自定义
-【2. 背景音乐】 [1] 自动合成 [2] 不加 [3] 手动提供 MP3
-【3. 默认视觉】 [1]~[10] 选一个 [0] 每次 AI 推荐
-【4. TTS 配音】 [1] 小米 MiMo [2] 暂不加
+**左图右文 / 左文右图** — 适合展示产品+特性
+```css
+.horiz { display: flex; gap: 48px; }
+.col-img { flex: 0 0 600px; }
+.col-text { flex: 1; }
 ```
+
+**三列/四列卡片** — 适合罗列功能、数据、卖点
+```css
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+```
+
+**大数字冲击** — 适合展示年份、数据、规模
+```css
+.big-num { font-size: 120px; font-weight: 900; }
+```
+
+**图片 + 标注气泡** — 适合展示截图细节
+```css
+.bubble { position: absolute; padding: 8px 16px; background: #fff; border-radius: 8px; }
+```
+
+**文字动画**：
+- 模糊 reveal：`filter: blur(20px) → 0`
+- 逐字弹入：stagger 0.03s × per-character
+- 缩放弹入：`scale: 0.8→1, back.out`
+- 滑入：`x: -60→0` 或 `y: 40→0`
+
+**场景过渡**（stagger 0.25s out + 0.3s in）：
+- 淡入淡出（通用）
+- 缩放穿越（场景放大消失→新场景缩小恢复）
+- 滑动切换（左右推出）
+
+### Phase 4: 渲染前自查
+
+渲染前打开 `index.html` 在脑中过一遍：
+
+- [ ] 每个场景用的素材图都不一样（不重复）
+- [ ] 有至少 1 个大数字/大数据场景
+- [ ] 有至少 1 个全屏图片+蒙层场景
+- [ ] 场景类型数 ≥ 总场景数的 50%（6 个场景至少有 3 种布局）
+- [ ] 标题字号 ≥72px，可读性够
+- [ ] 没有两屏纯文字相邻
+
+然后：
+```bash
+npm run check && npm run render
+cp renders/*.mp4 ../rendered.mp4
+```
+
+---
+
+## 工具速查
+
+| 工具 | 用途 |
+|------|------|
+| kimi-webbridge | 浏览器调研网站、Google Images 搜图 |
+| HyperFrames | HTML → MP4（`npx hyperframes init`） |
+| FFmpeg | 合成 BGM |
+| 小米 MiMo TTS | 配音（需 API Key） |
+
+## 视觉风格速查
+
+| 风格 | 底色 | 主色 | 适合 |
+|------|------|------|------|
+| 极简白 | `#fafafa` | 蓝紫渐变 | 商务、SaaS、教程 |
+| 纯黑暴力 | `#000` | 纯白+红 | 游戏、影视、冲击力 |
+| 暗金 | `#0c0c0c` | 金色渐变 | 高端品牌、奢侈品 |
+| 赛博朋克 | `#0a0a12` | 紫+青绿 | 科技、AI、Web3 |
+| 暗夜绿 | `#0a0f0a` | 绿青渐变 | 终端/黑客/安全 |
+| 冰川蓝 | `#f0f5fa` | 深蓝渐变 | 医疗、金融、专业 |
+| 暖橘日落 | `#1a100a` | 橙粉渐变 | 生活、温暖、故事 |
+| 红黑警戒 | `#0a0000` | 红色渐变 | 促销、警告、紧迫 |
+| 霓虹粉紫 | `#0f0a14` | 粉紫渐变 | 潮流、年轻、音乐 |
+| 活力橙蓝 | `#0f0f1a` | 橙蓝渐变 | 运动、活力、创新 |
 
 ## 环境
 
@@ -99,4 +168,4 @@ Node.js ≥ 22 · FFmpeg · HyperFrames · kimi-webbridge
 
 ## HyperFrames 规范
 
-`class="clip"`、`data-start/duration/track-index`、GSAP `paused: true` 注册到 `window.__timelines`、orb 不同 track-index、场景结束 `tl.set()` hard kill、BGM 用 `src="bgm.mp3"`、不用 `Math.random()`/`Date.now()`
+`class="clip"`、`data-start/duration/track-index`、GSAP `paused: true` 注册到 `window.__timelines`、场景结束 `tl.set()` hard kill、BGM `src="bgm.mp3"`、不用 `Math.random()`/`Date.now()`
