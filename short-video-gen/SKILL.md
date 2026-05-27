@@ -152,6 +152,15 @@ kimi-webbridge · HyperFrames · FFmpeg · 小米 MiMo TTS
 
 Node.js ≥ 22 · FFmpeg · kimi-webbridge
 
-## HyperFrames 规范
+## HyperFrames 核心规则
 
-`class="clip"`、`data-start/duration/track-index`、GSAP `paused:true` → `window.__timelines`、`tl.set()` hard kill、不用 `Math.random()`/`Date.now()`
+**HyperFrames 管理可见性，GSAP 只做动画。不要用 GSAP 控制元素显示/隐藏。**
+
+1. 每个时序元素必须是 `<div class="clip" data-start="X" data-duration="Y" data-track-index="Z">`
+2. `data-start/duration` 控制可见时段——HyperFrames 自动显示/隐藏，不要用 GSAP `opacity 0→1`
+3. GSAP 只用于：弹入(`scale`/`y`)、抖动、变色、发光——在元素已经可见的前提下
+4. **歌词 MV**：每行歌词 = 一个 `.clip` div，`data-start`=LRC 时间戳，`data-duration`=到下一句的间隔
+5. **背景**：每种背景色/装饰 = 一个独立 `.clip` div，按段落时间轴切换
+6. BGM = `<audio class="clip" data-start data-duration>`
+7. `paused:true` GSAP timeline 注册到 `window.__timelines["main"]`
+8. 不用 `Math.random()`/`Date.now()`
