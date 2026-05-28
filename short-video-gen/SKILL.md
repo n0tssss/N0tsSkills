@@ -545,8 +545,12 @@ BGM 音量 `data-volume="0.06-0.08"`，VO 音量 `data-volume="1.0"`。
 
 ## 工具 & 环境
 
-kimi-webbridge · HyperFrames · FFmpeg · 小米 MiMo TTS
-Node.js ≥ 22
+- **kimi-webbridge**（浏览器调研）：`127.0.0.1:10086`，需要 Chrome 扩展连接
+- **HyperFrames**：`npx hyperframes`（init / preview / check / render / add）
+- **FFmpeg**：BGM 合成（正弦波 + 粉噪）
+- **小米 MiMo TTS**：`api.xiaomimimo.com/v1`，OpenAI 兼容接口
+- **Node.js** ≥ 22
+- **代理**（Clash）：`127.0.0.1:7897`
 
 ## HyperFrames 速查
 
