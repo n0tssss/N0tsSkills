@@ -192,6 +192,48 @@ npx hyperframes add <block-name>
 | 截图/产品 | `parallax-zoom`、`parallax-unzoom` |
 | 结尾 CTA | `logo-outro`、`pill-karaoke` |
 
+### 官方项目文件和流程（来自 HyperFrames launch video）
+
+复杂项目建议维护以下文档（参考官方团队做法）：
+
+```
+SCRIPT.md      # 配音脚本（VO 原文，供 TTS/录音用）
+STORYBOARD.md  # 分镜表 + 视觉描述
+HANDOFF.md     # 每次迭代的生产日志（改了什么、为什么、验证方法）
+```
+
+**脚本格式示例：**
+```markdown
+## Spoken VO
+
+Spoken lines only. This block feeds TTS verbatim.
+```
+Imagine you could make videos like this.
+Your agent already can — just give it HyperFrames.
+Open source. HTML in, video out.
+```
+```
+
+### 官方已验证的子合成时间线修复
+
+HyperFrames 官方团队在 launch video 中遇到了完全相同的黑帧问题。
+**根因：** 框架由 `timeline.duration()` 决定可见性，不是 `data-duration`。
+**修复：** 每个子合成末尾填充时间线。
+
+```javascript
+tl.to({}, { duration: MASTER_SLOT_DURATION }, 0);
+window.__timelines["composition-id"] = tl;
+```
+
+**验证方法**（官方提供，在浏览器控制台运行）：
+```javascript
+const p = document.querySelector('hyperframes-player');
+const iw = p.shadowRoot.querySelector('iframe').contentWindow;
+Object.fromEntries(Object.entries(iw.__timelines).map(([k,v]) => [k, +v.duration().toFixed(4)]));
+```
+
+任何 `timeline.duration() < master slot data-duration` 的合成都会出现黑帧。
+
 ### HyperFrames 组件库（62 个块 + 23 个组件）
 
 安装：`npx hyperframes add <name>`
