@@ -1,13 +1,15 @@
 ---
 name: short-video-gen
-description: 视频制作 — 选题评估→参数确认→信息收集→脚本设计→实现渲染，全流程带审核关卡
-argument-hint: "<视频主题描述>"
+description: 视频制作 — 调研→审核→脚本→生成→配音 完整工业化流水线
+argument-hint: "<视频想法>"
 level: 4
 ---
 
 # 视频制作
 
-用户提想法 → AI 走完整流程 → 输出视频。
+用户提出想法 → AI 自主完成调研/审核/分镜/生成/TTS → 输出视频。
+
+**关键流程：先给出建议让用户决策，再执行。**
 
 ---
 
@@ -15,22 +17,10 @@ level: 4
 
 ```
 D:\视频生成\<project>/
-  素材/           # 截图、图片、Logo、BGM
-  index.html      # HyperFrames 项目文件
-  rendered.mp4    # 最终视频
-```
-
-## 首次使用
-
-`.config.json` 不存在时，打印选项等用户输入：
-
-```
-🎬 视频制作 — 首次配置
-
-【1. 默认时长】 [0] AI 判断 [1] 15s [2] 30s [3] 60s [4] 自定义
-【2. 背景音乐】 [1] 自动合成 [2] 不加 [3] 手动提供 MP3
-【3. 默认视觉】 [1]~[10] 选一个 [0] 每次 AI 推荐
-【4. TTS 配音】 [1] 小米 MiMo [2] 暂不加
+  素材/              # 截图、图片、Logo、BGM
+  compositions/      # 分镜片段（子合成用于复杂项目）
+  index.html         # 主合成
+  rendered.mp4       # 最终视频
 ```
 
 ---
@@ -41,28 +31,31 @@ D:\视频生成\<project>/
 用户提想法
     │
     ▼
-Stage 0  选题评估   竞品调研 + 卖点分析 + 流量预估 + 用户确认
+Stage 0  选题评估   竞品调研 → 选题分析 → 用 AskUserQuestion 确认
     │
     ▼
-Stage 1  参数确认   用 AskUserQuestion 逐一确认视频规格，汇总打印
+Stage 1  参数确认   给出建议 → AskUserQuestion 让用户决策（时长/风格/比例/BGM/TTS）
     │
     ▼
-Stage 2  信息收集   深度调研 + 素材收集 + 数据核实
+Stage 2  信息收集   kimi-webbridge 深度调研 + 素材收集 + 数据核实
     │
     ▼
-Gate 2   素材审核   6 项检查，不通过打回 Stage 2（标注缺什么）
+Gate 2   素材审核   ≥5文件？有logo？有主视觉？数据有来源？→ 不通过打回
     │
     ▼
-Stage 3  脚本设计   分镜表 + 每场景素材/文字/动画/时长
+Stage 3  脚本设计   分镜表 + 画面描述 + 素材关联 + 视觉动画方案
     │
     ▼
-Gate 3   方案审核   5 项检查，不通过打回 Stage 3（标注改哪里）
+Gate 3   方案审核   一条主线？前3秒钩子？素材全覆盖？布局多样性？→ 不通过打回
     │
     ▼
-Stage 4  实现渲染   HTML + CSS + GSAP → MP4
+Stage 4  实现渲染   HTML + CSS + GSAP + 可用组件 → check → render
     │
     ▼
-Gate 4   最终审核   技术 + 内容，不通过回对应阶段
+Gate 4   最终审核   技术质量 + 内容质量 → 不通过回修
+    │
+    ▼
+Stage 5  音频合成   TTS 配音（可选）+ BGM 混音
     │
     ▼
 rendered.mp4
@@ -72,145 +65,169 @@ rendered.mp4
 
 ## Stage 0: 选题评估
 
-用户提出想法后，先分析值不值得做。
-
 ### 0.1 竞品调研
 
-Web 搜索同类内容，收集真实数据：
-
-```
-搜 B站：site:bilibili.com <关键词>
-搜抖音：site:douyin.com <关键词>
-搜 YouTube：site:youtube.com <关键词>
-```
-
-提取：同类最高播放量、常见角度、优缺点、评论区观众的未满足需求。
+WebSearch 搜同类内容，了解：
+- 同类最高播放量（天花板在哪）
+- 常见角度和切入点
+- 评论区的未满足需求
+- 我们的差异化空间
 
 ### 0.2 选题分析
 
 - **一句话卖点**：看完能获得什么？
 - **目标受众**：谁看？什么场景看？
-- **差异化**：和同类内容有什么不同？
-- **流量潜力**：有人搜这个话题吗？适合传播吗？
+- **差异化**：和同类有什么不同？
+- **流量潜力**：话题性强？适合传播？
 - **执行可行性**：素材能收集到吗？
 
 ### 0.3 用户确认
 
-用 `AskUserQuestion` 确认方向：
-
-```
-"我的分析：[简述卖点+受众+差异化]。这个方向可以吗？"
-选项：[1] 可以，继续 [2] 换个角度 [3] 我再想想
-```
+用 `AskUserQuestion` 给出分析并确认方向。
 
 ---
 
 ## Stage 1: 参数确认
 
-用 `AskUserQuestion` 逐一确认。用户说"你定"就跳过该项。
+**先给出建议，再用 AskUserQuestion 让用户决策。**
+
+必须确认的参数（缺什么问什么）：
 
 ```
-时长：[1] AI 判断 [2] 15s [3] 30s [4] 60s [5] 自定义
-
-视觉风格：
-  [1] AI 推荐 [2] 赛博朋克 [3] 极简白 [4] 暗金 [5] 活力橙蓝
-  [6] 暗夜绿 [7] 霓虹粉紫 [8] 纯黑暴力 [9] 暖橘日落 [10] 冰川蓝
-
-视频比例：[1] 1920×1080 [2] 1080×1920 [3] 其他
-
+视频时长：[建议具体值] → [1] AI判断 [2] 15s [3] 30s [4] 60s [5] 自定义
+视觉风格：[建议具体风格] → 10种配色可选 + AI推荐
+视频比例：[建议具体比例] → [1] 1920×1080 横屏 [2] 1080×1920 竖屏 [3] 其他
 BGM：[1] 自动合成 [2] 不加 [3] 手动提供
 TTS：[1] 不加 [2] 小米 MiMo（需 API Key）
 ```
 
-确认完毕后，打印汇总让用户过目。
+确认完毕后打印汇总。
 
 ---
 
 ## Stage 2: 信息收集
 
-**不全不进 Stage 3。**
-
-### 按类型调研
+按题材类型深度调研：
 
 **网站/产品/服务**（kimi-webbridge）：
 - 首页、关于、功能、定价、联系——逐个页面截图
-- 提取真实数据（用户数、年份、规模、slogan）
-- 下载 logo，记录可用文案
+- 提取真实数据（用户数、年份、slogan）
+- 下载 logo，记录所有可用文案
 - 有 Demo 的打开截图
 
 **开源项目**：
-- 读 README 提取功能、技术栈、使用场景
-- 下载官方截图/Logo（GitHub `assets/` 目录）
-- 获取真实数据（Stars/Forks/License）
-- 有官网的去截图
+- 读 README，提取功能/技术栈/场景
+- 下载官方截图/Logo（assets/目录）
+- 获取 Stars/Forks/License 等真实数据
 
-**游戏/影视/文化**：
-- kimi-webbridge 搜 Google Images/壁纸站，下载官方海报、角色图、场景截图
-- Web 搜索收集评分、获奖、名场面、经典台词
-- ≥5 张不同内容的高清图
+**游戏/影视/文化**：搜 Google Images/壁纸站，≥5张不同高清图
 
-**教程/操作指南**：
-- kimi-webbridge 实际操作流程，每步截图
+**数据核实**：所有数字必须有来源，不确定的不用。
 
-### 数据核实
-
-所有引用数字必须有来源。不确定的宁可不用，不可瞎编。
-
---- 
+---
 
 ### Gate 2: 素材审核
 
-不通过时标注具体缺什么，打回 Stage 2：
+```
+□ 素材 ≥5 个不同文件？
+□ 不同内容方向？（不是同一张图反复用）
+□ 有高清主视觉？（能全屏铺满的）
+□ 有 logo？
+□ 关键数据有来源？
+□ 现有素材能覆盖每个场景？
+```
 
-```
-□ 素材数量：≥5 个不同文件？
-  → 缺：______
-□ 素材多样性：不同页面/角度/内容？（不是同一张图反复用）
-  → 缺：______
-□ 有高清主视觉图吗？（能全屏铺满的）
-□ 有 logo 吗？
-□ 关键数据有来源吗？（不是编的）
-  → 可疑项：______
-□ 现有素材能覆盖每个场景吗？（N 个场景需要 N 张不同的图）
-```
+不通过标注缺什么，打回 Stage 2。
 
 ---
 
 ## Stage 3: 脚本设计
 
-产出分镜表，每行一个场景：
+产出分镜表：
 
-| # | 时间 | 素材 | 画面描述 | 文字 | 动画 |
-|---|------|------|---------|------|------|
-| 1 | 0-4s | hero.jpg | 全屏蒙层+大字 | "XXX" | 模糊 reveal |
-| 2 | ... | ... | ... | ... | ... |
+| # | 时间 | 素材 | 画面描述 | 画面文字 | 动画/特效 |
+|---|------|------|---------|---------|----------|
+| 1 | 0-4s | hero.png | 全屏蒙层+大字 | "X" | 模糊reveal |
 
 要求：
-- 前 3 秒有钩子（反常识/大数字/痛点/好奇）
-- 每场景用不同素材图
+- 前3秒有钩子（反常识/大数字/痛点/好奇）
+- 每场景用不同素材
 - 相邻场景布局不重复
-- 每屏文字简短有力
+- 每个场景指定所用素材
 
 ---
 
 ### Gate 3: 方案审核
 
-不通过标注改哪里，打回 Stage 3：
+```
+□ 一句话说得清视频讲什么吗？
+□ 前3秒够强吗？
+□ 每个场景都指定了素材？
+□ 场景布局有变化（≥3种）？
+□ 符合用户确认的参数和方向？
+```
 
-```
-□ 一句话能说清这个视频讲什么吗？
-  → 说不清说明：______
-□ 前 3 秒够强吗？
-□ 每个场景都指定了素材吗？
-□ 场景布局有变化吗（≥3 种）？
-□ 符合 Stage 0-1 确认的方向和参数吗？
-```
+不通过标注改哪里，打回 Stage 3。
 
 ---
 
 ## Stage 4: 实现渲染
 
-写 HTML + CSS + GSAP。默认 1920×1080。
+### 视觉特效系统（按需使用）
+
+HyperFrames 提供 50+ 现成组件：
+
+```bash
+npx hyperframes add <block-name>
+```
+
+**推荐组件**：
+
+| 场景类型 | 推荐组件 |
+|---------|---------|
+| 开场/标题 | `kinetic-slam`、`glitch-rgb`、`neon-glow` |
+| 数据展示 | `data-chart`、`shimmer-sweep`、`texture-mask-text` |
+| 关键词强调 | `emoji-pop`、`particle-burst`、`highlight` |
+| 过渡转场 | 20+ 种 shader transitions 可选 |
+| 截图/产品 | `parallax-zoom`、`parallax-unzoom` |
+| 结尾 CTA | `logo-outro`、`pill-karaoke` |
+
+### 常用布局模式
+
+```
+A. 全屏图片 + 暗色蒙层 + 大字标题    — 开场/章节分隔
+B. 左图右文/左文右图                  — 产品展示
+C. 多列卡片（flex/grid）              — 功能罗列
+D. 大数字冲击                         — 年份/规模/数据
+E. 图片 + 标注气泡                    — 截图细节
+F. 2×2 网格卡片                       — 场景/案例展示
+G. 对比布局（左右分栏）               — 前后对比
+H. 底部 caption 叠加（backdrop-filter）— 旁白/标题
+```
+
+### 复杂项目建议用子合成
+
+场景较多时用 `data-composition-src` 拆分：
+
+```html
+<div id="scene1" data-composition-id="intro" data-composition-src="compositions/intro.html"
+     data-start="0" data-duration="10" data-track-index="1"></div>
+```
+
+### 字幕/文字叠加
+
+使用底部 caption + backdrop-filter 更专业：
+
+```css
+.caption {
+  position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
+  padding: 12px 28px; border-radius: 10px;
+  background: rgba(0,0,0,0.55); backdrop-filter: blur(8px);
+  color: rgba(255,255,255,0.92); font-size: 40px;
+}
+```
+
+### 渲染
 
 ```bash
 npm run check && npm run render
@@ -221,38 +238,46 @@ cp renders/*.mp4 ../rendered.mp4
 
 ### Gate 4: 最终审核
 
-不通过回对应阶段修复：
+```
+□ 正常播放？无卡帧/花屏/黑屏？
+□ 内容符合设计方案？
+□ 作为观众，觉得好看吗？原因？
+```
 
-```
-□ 视频能正常播放？无卡帧/花屏/黑屏？
-□ 内容符合 Stage 3 的设计方案？
-□ 作为观众，觉得这视频好看吗？
-  → 不好看的原因：______
-```
+不通过回修。
+
+---
+
+## Stage 5: 音频合成
+
+如果启用 TTS：
+1. 从脚本台词生成时间戳台词列表
+2. 每句调用 MiMo API 生成 WAV
+3. 在 HTML 中为每句添加独立 `<audio>` 标签
+4. BGM 音量压到 0.06-0.08
 
 ---
 
 ## 实践经验
 
-这些坑已经踩过，不要在同一个地方再摔：
-
-- **数据必须核实**：去网站/官方渠道确认，不要用搜索结果里的二手信息
-- **HyperFrames 可见性**：`data-start/duration` 管理元素显示/隐藏。GSAP 只做动画（scale/y/opacity 微调），不用 GSAP 控制显示隐藏
-- **浮点精度**：两个相邻 clip 的 duration 设为 `nextStart - currentStart - 0.02`，避免 `overlapping_clips_same_track` 报错
-- **渲染前必跑 check**：`npm run check` 能提前发现 clip 重叠、元素溢出等问题
-- **素材先行**：素材不够不要开始写 HTML。没图的视频 = 幻灯片
-- **音频 AI 无法验证**：歌词 MV 的 LRC 和音频必须同源
+- **数据核实**：去官方渠道确认，不编数字
+- **HyperFrames 可见性**：`data-start/duration` 管显示/隐藏，GSAP 只做动画
+- **浮点精度**：duration = nextStart - currentStart - 0.02
+- **必跑 check**：检查 overlap/溢出
+- **素材先行**：素材不够不写 HTML，否则=幻灯片
+- **块组件**：`npx hyperframes add <name>` 安装现成特效块
 
 ## 工具 & 环境
 
 kimi-webbridge · HyperFrames · FFmpeg · 小米 MiMo TTS
-Node.js ≥ 22 · FFmpeg
+Node.js ≥ 22
 
 ## HyperFrames 速查
 
 ```html
-<div class="clip" data-start="0" data-duration="5.0" data-track-index="10">
+<div class="clip" data-start="0" data-duration="5" data-track-index="10">
 ```
 - GSAP `paused:true` → `window.__timelines["main"]`
-- orb 不同 track-index 避免 overlap
-- `tl.set()` hard kill，不用 `Math.random()`/`Date.now()`
+- orb 不同 track-index
+- `tl.set()` hard kill
+- 不用 `Math.random()` / `Date.now()`
