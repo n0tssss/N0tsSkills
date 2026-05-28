@@ -214,6 +214,92 @@ npx hyperframes add <block-name>
 **社交/UI 叠加块（11 个）**：`instagram-follow` `tiktok-follow` `yt-lower-third` `x-post`
 **VFX 特效块（10 个）**：`vfx-shatter` `vfx-portal` `vfx-magnetic` `logo-outro`
 
+### 子合成（复杂项目标准模式）
+
+多场景视频应拆分为独立合成文件，用 `data-composition-src` 编排。
+
+**推荐项目结构：**
+```
+project/
+├── index.html            # 编排器：音频 + 子合成插槽 + 空时间线
+├── compositions/
+│   ├── scene-1-hook.html
+│   ├── scene-2-features.html
+│   └── scene-3-cta.html
+├── assets/
+│   └── fonts/
+└── renders/
+```
+
+**父合成（index.html）：**
+```html
+<div id="master" data-composition-id="master" data-start="0" data-duration="60"
+     data-width="1080" data-height="1920">
+  <audio src="bgm.mp3" class="clip" data-start="0" data-duration="60"
+         data-track-index="40" data-has-audio="true" data-volume="0.06"></audio>
+
+  <div data-composition-id="scene1" data-composition-src="compositions/scene-1-hook.html"
+       data-start="0" data-duration="8" data-track-index="1"></div>
+  <div data-composition-id="scene2" data-composition-src="compositions/scene-2-features.html"
+       data-start="8" data-duration="12" data-track-index="1"></div>
+</div>
+
+<script>
+window.__timelines = window.__timelines || {};
+window.__timelines["master"] = gsap.timeline({ paused: true });  // 空时间线
+</script>
+```
+
+**子合成（compositions/scene-1-hook.html）：**
+```html
+<template id="scene1-template">
+<div data-composition-id="scene1" data-width="1080" data-height="1920"
+     data-start="0" data-duration="8">
+  <!-- 场景内容 -->
+</div>
+<style>
+  [data-composition-id="scene1"] { /* 作用域样式 */ }
+</style>
+</template>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+<script>
+window.__timelines = window.__timelines || {};
+var tl = gsap.timeline({ paused: true });
+tl.from("#title", { opacity: 0, y: 80, duration: 0.6 }, 0);
+
+// ⚠️ 关键：填充时间线到 data-duration，否则框架会提前隐藏（黑帧）
+tl.to({}, { duration: 8 }, 0);
+window.__timelines["scene1"] = tl;
+</script>
+```
+
+### 子合成时间线规则 ⚠️
+
+HyperFrames 根据 GSAP `.duration()` 决定可见性。如果 `tl.duration()` < `data-duration`，框架提前 `visibility:hidden` → **黑帧**。
+
+```javascript
+// ✅ 填充到完整插槽时长
+tl.to({}, { duration: 8 }, 0);
+
+// ❌ tl.duration()=4s, 父级 data-duration=8 → 后4s黑屏
+```
+
+验证（浏览器控制台）：
+```javascript
+Object.fromEntries(
+  Object.entries(window.__timelines).map(([k,v]) => [k, +v.duration().toFixed(4)])
+);
+```
+
+### 音频轨道编号约定
+
+| 范围 | 用途 |
+|-----|------|
+| 0 | 画外音/VO |
+| 40+ | BGM |
+| 80+ | 音效 |
+| 90+ | 字幕叠加 |
+
 ### 嵌入方法
 
 ```html
@@ -409,11 +495,37 @@ cp renders/*.mp4 ../rendered.mp4
 
 ## Stage 5: 音频合成
 
-如果启用 TTS：
-1. 从脚本台词生成时间戳台词列表
-2. 每句调用 MiMo API 生成 WAV
-3. 在 HTML 中为每句添加独立 `<audio>` 标签
-4. BGM 音量压到 0.06-0.08
+### 配音（TTS）
+
+用 `tts-generate.js` 模块自动生成。前置条件：
+
+1. 从脚本台词提取 **tts-lines.json**：
+   ```json
+   [{ "text": "每次聊天都像第一次见面", "start": 0.5, "duration": 2.5 }]
+   ```
+
+2. 创建 **tts-config.json**（需用户提供 API Key）：
+   ```json
+   { "apiKey": "sk-xxx", "voice": "alloy" }
+   ```
+
+3. 执行生成：
+   ```bash
+   node tts-generate.js
+   ```
+
+4. 生成的 `<audio>` 标签粘贴到 `index.html` 的 `#root` 中
+
+### BGM
+
+```bash
+# 合成简单 BGM（FFmpeg 正弦波 + 粉噪）
+ffmpeg -f lavfi -i "sine=frequency=220:duration=60" -f lavfi -i "anoisesrc=d=60:c=pink:a=0.02" \
+  -filter_complex "[0]volume=0.3[a];[1]volume=0.5[b];[a][b]amix=inputs=2:duration=first" \
+  assets/bgm.mp3
+```
+
+BGM 音量 `data-volume="0.06-0.08"`，VO 音量 `data-volume="1.0"`。
 
 ---
 
