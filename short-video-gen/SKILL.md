@@ -278,8 +278,9 @@ window.__timelines["scene1"] = tl;
 HyperFrames 根据 GSAP `.duration()` 决定可见性。如果 `tl.duration()` < `data-duration`，框架提前 `visibility:hidden` → **黑帧**。
 
 ```javascript
-// ✅ 填充到完整插槽时长
-tl.to({}, { duration: 8 }, 0);
+// ✅ 填充到完整插槽时长（两种方式均可）
+tl.to({}, { duration: 8 }, 0);  // 空对象补间
+tl.set({}, {}, 8 * 30);         // 或延长到最后一帧（30fps）
 
 // ❌ tl.duration()=4s, 父级 data-duration=8 → 后4s黑屏
 ```
@@ -289,6 +290,27 @@ tl.to({}, { duration: 8 }, 0);
 Object.fromEntries(
   Object.entries(window.__timelines).map(([k,v]) => [k, +v.duration().toFixed(4)])
 );
+```
+
+### GSAP 缓动函数映射
+
+用自然语言描述动画感觉：
+
+| 描述 | GSAP easing | 适合场景 |
+|-----|------------|---------|
+| 流畅 | `power2.out` | 默认，通用入场 |
+| 利落 | `power4.out` | 快速切换、数据变化 |
+| 弹性 | `back.out(1.5)` | 数字弹出、CTA 按钮 |
+| 弹簧 | `elastic.out(1,0.3)` | 强调、趣味元素 |
+| 戏剧性 | `expo.out` | 大字标题、reveal |
+| 梦幻 | `sine.inOut` | 淡入淡出、呼吸动画 |
+
+### 快速迭代工作流
+
+```bash
+npx hyperframes render --quality draft   # 草稿模式（CRF 28，1-3min）
+ffmpeg -ss 5 -i renders/draft.mp4 -frames:v 1 frame_5s.png  # 检查某一帧
+npx hyperframes render                   # 最终渲染
 ```
 
 ### 音频轨道编号约定
