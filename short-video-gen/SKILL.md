@@ -192,6 +192,47 @@ npx hyperframes add <block-name>
 | 截图/产品 | `parallax-zoom`、`parallax-unzoom` |
 | 结尾 CTA | `logo-outro`、`pill-karaoke` |
 
+### HyperFrames 组件库（62 个块 + 23 个组件）
+
+安装：`npx hyperframes add <name>`
+
+**过渡效果块（33 个）** — 场景切换，4s 时长：
+`flash-through-white` `cinematic-zoom` `glitch` `cross-warp-morph` `domain-warp-dissolve`
+`ridged-burn` `ripple-waves` `gravitational-lens` `swirl-vortex` `light-leak` `whip-pan`
+`transitions-blur` `transitions-dissolve` `transitions-distortion` `transitions-push`
+
+**文字动效组件（16 个）** — 叠加在子合成中：
+`caption-kinetic-slam`(全屏大字交替进入) `caption-particle-burst`(关键词粒子爆炸)
+`caption-glitch-rgb`(RGB故障) `caption-neon-glow`(霓虹辉光) `caption-matrix-decode`(矩阵解码)
+`caption-emoji-pop`(表情弹出) `caption-weight-shift`(字重动画)
+
+**电影级叠加组件（4 个）** — 直接 paste 到 HTML：
+`grain-overlay`(胶片颗粒) `vignette`(暗角晕影) `shimmer-sweep`(光泽扫描)
+`texture-mask-text`(纹理遮罩文字)
+
+**数据可视化块（8 个）**：`data-chart` `world-map` `us-map` `flowchart`
+**社交/UI 叠加块（11 个）**：`instagram-follow` `tiktok-follow` `yt-lower-third` `x-post`
+**VFX 特效块（10 个）**：`vfx-shatter` `vfx-portal` `vfx-magnetic` `logo-outro`
+
+### 嵌入方法
+
+```html
+<!-- 组件：直接贴到 #root 内 -->
+<div id="grain-overlay"><div class="grain-texture"></div></div>
+<div id="hf-vignette"></div>
+
+<!-- 块：data-composition-src 嵌入子合成 -->
+<div data-composition-src="compositions/flash-through-white.html"
+     data-duration="4" data-width="1080" data-height="1920"></div>
+```
+
+### 使用经验
+
+- `grain-overlay` + `vignette` 是"必加"组合，零配置提升观感
+- caption 组件在子合成中使用
+- 过渡块默认 1920×1080，竖屏要改成 1080×1920
+- `timeline_track_too_dense` 警告说明该拆子合成了
+
 ## 竖屏 (9:16) 设计原则 ⚠️ 关键
 
 竖屏 (1080×1920) 和横屏 (1920×1080) 是完全不同的设计范式。
