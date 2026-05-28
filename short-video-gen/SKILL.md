@@ -98,7 +98,7 @@ WebSearch 搜同类内容，了解：
 视觉风格：[建议具体风格] → 10种配色可选 + AI推荐
 视频比例：[建议具体比例] → [1] 1920×1080 横屏 [2] 1080×1920 竖屏 [3] 其他
 BGM：[1] 自动合成 [2] 不加 [3] 手动提供
-TTS：[1] 不加 [2] 小米 MiMo（需 API Key）
+TTS：[1] 不加 [2] edge-tts（免费） [3] 小米 MiMo（需 API Key）
 ```
 
 确认完毕后打印汇总。
@@ -525,35 +525,44 @@ tl.from("#subtitle", { opacity: 0, filter: "blur(10px)", duration: 0.5 });
 
 ### 字幕/文字叠加
 
-使用底部 caption + backdrop-filter 更专业：
+使用底部 caption + backdrop-filter 更专业。竖屏字幕 44-55px，横屏 32-40px：
 
 ```css
+/* 竖屏使用 */
 .caption {
-  position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
-  padding: 12px 28px; border-radius: 10px;
+  position: absolute; bottom: 180px; left: 50%; transform: translateX(-50%);
+  padding: 16px 40px; border-radius: 16px;
   background: rgba(0,0,0,0.55); backdrop-filter: blur(8px);
-  color: rgba(255,255,255,0.92); font-size: 40px;
+  color: rgba(255,255,255,0.92); font-size: 44px; text-align: center;
+  white-space: nowrap;
 }
 ```
 
 ### 渲染
 
 ```bash
-npm run check && npm run render
+npx hyperframes render --quality draft   # 快速迭代（CRF 28，1-3min）
+npx hyperframes render                   # 最终渲染（标准质量）
 cp renders/*.mp4 ../rendered.mp4
 ```
+
+也可以用 `npm run check && npm run render` 一条命令跑完整流程。
 
 ---
 
 ### Gate 4: 最终审核
 
 ```
+□ npm run check 输出 0 error？
 □ 正常播放？无卡帧/花屏/黑屏？
-□ 内容符合设计方案？
-□ 作为观众，觉得好看吗？原因？
+□ 竖屏布局符合安全区规范？
+□ 每个场景有独立布局（非重复）？
+□ 前3秒钩子到位？
+□ 配音/字幕时间轴对齐？
+□ BGM 音量不盖过配音？
 ```
 
-不通过回修。
+任一不通过回修对应 Stage。
 
 ---
 
