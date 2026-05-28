@@ -1,14 +1,14 @@
 # 抖音续火花 (douyin-streak-renewer)
 
-每日自动发送"自动续火花啦！"到抖音聊天，保持火花不灭。
+自动发送"自动续火花啦！"到抖音聊天，保持火花不灭。
 
 ## 功能
 
-- 每天 00:00 自动执行
 - 支持多对话批量发送
 - 通过 Kimi Webbridge 控制真实浏览器
 - 自动验证消息是否发送成功
 - 失败自动重试（最多 3 次）
+- 可配置执行频率（建议每天凌晨执行）
 
 ## 工作原理
 
@@ -18,7 +18,9 @@
 4. 验证消息是否出现在聊天记录中
 5. 失败则重试
 
-## 配置
+## 首次使用
+
+### 1. 配置联系人
 
 编辑 `scripts/streak.py` 修改联系人列表：
 
@@ -32,12 +34,18 @@ CONVERSATIONS = [
 
 名称使用 `includes()` 匹配，支持部分匹配。
 
-## 依赖
+### 2. 环境要求
 
 - Kimi Webbridge 守护进程运行中
 - Edge 浏览器扩展已连接
 - 抖音网页版已登录
 - 目标对话在聊天列表中可见
+
+### 3. 验证配置
+
+```bash
+python3 ~/.hermes/scripts/streak.py
+```
 
 ## 使用
 
@@ -45,7 +53,7 @@ CONVERSATIONS = [
 # 手动执行
 python3 ~/.hermes/scripts/streak.py
 
-# 创建定时任务
+# 创建定时任务（示例：每天 00:00）
 hermes cron create \
   --script streak.py \
   --schedule "0 0 * * *" \

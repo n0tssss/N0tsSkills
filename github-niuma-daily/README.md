@@ -22,6 +22,53 @@
 | 3-7 | 😴 划水牛马 | 主要在思考人生... |
 | 0-2 | 🏖️ 摸鱼牛马 | 休息日？还是在憋大招？ |
 
+## 首次使用（必须配置 Token）
+
+### 1. 生成 GitHub Token
+
+1. 访问 https://github.com/settings/tokens
+2. 点击 **Generate new token (classic)**（不要用 Fine-grained token）
+3. 勾选权限：**repo** + **read:user**
+4. Expiration 选择 **90 days** 或 **No expiration**
+5. 点击 **Generate token** 并复制
+
+### 2. 保存 Token
+
+由于系统会自动将 token 替换为 `***`，必须通过文件写入：
+
+```bash
+# 方法1：终端执行（推荐）
+echo "ghp_你的token" > ~/.hermes/.github_token
+
+# 方法2：Python
+python3 -c "
+with open('$HOME/.hermes/.github_token', 'w') as f:
+    f.write('ghp_你的token')
+"
+```
+
+### 3. 验证配置
+
+```bash
+python3 ~/.hermes/scripts/github-daily-summary.py
+```
+
+如果看到报告输出，说明配置成功。
+
+## 使用
+
+```bash
+# 手动执行
+python3 ~/.hermes/scripts/github-daily-summary.py
+
+# 创建定时任务（示例：每天 22:00）
+hermes cron create \
+  --script github-daily-summary.py \
+  --schedule "0 22 * * *" \
+  --no-agent \
+  --name "github-niuma-daily"
+```
+
 ## 输出示例
 
 ```
@@ -49,50 +96,12 @@
 - N0tsLabs（个人）：8 次提交
 ```
 
-## 配置
-
-### Token 文件
-
-```
-~/.hermes/.github_token
-```
-
-存放 GitHub Personal Access Token (classic)，需要 `repo` + `read:user` 权限。
-
-### 首次使用
-
-1. 访问 https://github.com/settings/tokens
-2. 点击 **Generate new token (classic)**
-3. 勾选 **repo** + **read:user**
-4. Expiration 选择 **90 days** 或 **No expiration**
-5. 生成后复制 token
-6. 写入文件：
-
-```python
-with open(os.path.expanduser("~/.hermes/.github_token"), "w") as f:
-    f.write("ghp_xxxxx")
-```
-
-## 使用
-
-```bash
-# 手动执行
-python3 ~/.hermes/scripts/github-daily-summary.py
-
-# 创建定时任务
-hermes cron create \
-  --script github-daily-summary.py \
-  --schedule "0 22 * * *" \
-  --no-agent \
-  --name "github-niuma-daily"
-```
-
 ## 仓库过滤
 
 脚本只统计以下仓库的活动：
 
-- 用户自己的仓库：`n0tssss/xxx`
-- 用户所属组织的仓库：`shwkea/xxx`、`N0tsLabs/xxx`
+- 用户自己的仓库：`用户名/xxx`
+- 用户所属组织的仓库（自动获取）
 
 Star 和 Fork 事件不受过滤影响。
 
@@ -101,5 +110,5 @@ Star 和 Fork 事件不受过滤影响。
 1. **Classic Token vs Fine-grained Token**：必须用 Classic Token (ghp_)，Fine-grained Token 会导致 401
 2. **Token 被系统替换**：对话中粘贴的 token 会被替换为 `***`，必须通过文件写入
 3. **SSL 网络错误**：脚本自动重试（3次，指数退避）
-4. **微信消息限流**：等待几分钟后自动恢复
+4. **消息限流**：等待几分钟后自动恢复
 5. **脚本超时**：已限制为前 40 个仓库
