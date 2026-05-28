@@ -425,6 +425,11 @@ cp renders/*.mp4 ../rendered.mp4
 - **必跑 check**：检查 overlap/溢出
 - **素材先行**：素材不够不写 HTML，否则=幻灯片
 - **块组件**：`npx hyperframes add <name>` 安装现成特效块
+- **竖屏横屏不通用**：竖屏是独立设计范式，不能把横屏缩小当竖屏用
+- **场景转场**：白闪过渡最简单高效——`tl.to(opacity:0) → tl.set(flash) → tl.to(flash:0) + tl.set(hard kill)`
+- **动效点缀**：关键数字用 `boxShadow` 脉冲发光，截图用 `filter:brightness()` 呼吸，关键词用金色渐变 + `textShadow` 辉光
+- **GSAP 硬重置**：每个 clip 结束边界必须加 `tl.set()`，否则非线性 seek 会留脏状态
+- **`flash-overlay` 要素**：需要 `class="clip"` + `data-track-index`（高于 scenes 低于 overlays）
 
 ## 工具 & 环境
 
