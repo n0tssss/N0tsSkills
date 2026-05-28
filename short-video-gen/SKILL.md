@@ -497,24 +497,25 @@ cp renders/*.mp4 ../rendered.mp4
 
 ### 配音（TTS）
 
-用 `tts-generate.js` 模块自动生成。前置条件：
+用 `tts-generate.js` 模块自动生成。
 
 1. 从脚本台词提取 **tts-lines.json**：
    ```json
    [{ "text": "每次聊天都像第一次见面", "start": 0.5, "duration": 2.5 }]
    ```
 
-2. 创建 **tts-config.json**（需用户提供 API Key）：
-   ```json
-   { "apiKey": "sk-xxx", "voice": "alloy" }
-   ```
-
-3. 执行生成：
+2. 执行生成（默认 edge-tts，免费）：
    ```bash
+   pip install edge-tts
    node tts-generate.js
    ```
 
-4. 生成的 `<audio>` 标签粘贴到 `index.html` 的 `#root` 中
+3. 生成的 `<audio>` 标签粘贴到 `index.html` 的 `#root` 中
+
+edge-tts 可用中文语音：`zh-CN-YunyangNeural`（男声专业）
+也可用小米 MiMo（需 API Key）：`node tts-generate.js --mimo`
+
+**注意**：每个 audio 标签必须有唯一 `id`，否则渲染器不会发现 → 静音。
 
 ### BGM
 
