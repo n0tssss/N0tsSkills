@@ -1,37 +1,24 @@
 /**
- * TTS 配音生成模块 — 小米 MiMo API
+ * TTS 配音生成模块
  *
- * 用法：
- *   1. 在项目根目录创建 tts-config.json：
- *      { "apiKey": "your-key-here", "voice": "auto" }
- *   2. node tts-generate.js
+ * 方式一：edge-tts（免费，但某些网络环境可能不可达）
+ *   安装：pip install edge-tts
+ *   用法：node tts-generate.js
+ *
+ * 方式二：小米 MiMo TTS（需 API Key，更稳定）
+ *   创建 tts-config.json: { "apiKey": "sk-xxx", "voice": "alloy" }
+ *   用法：node tts-generate.js --mimo
  *
  * 输入：tts-lines.json — 台词列表
- *   [{ "text": "台词内容", "start": 0, "duration": 2.5 }]
- *
- * 输出：assets/tts/ 目录下的 WAV 文件
- *       以及 HTML <audio> 标签片段
- */
 
 const fs = require('fs');
 const path = require('path');
-const https = require('https');
-const http = require('http');
+const { execSync, exec } = require('child_process');
 
-const CONFIG_PATH = './tts-config.json';
 const LINES_PATH = './tts-lines.json';
 const OUTPUT_DIR = './assets/tts';
 
 // ============ Config ============
-
-function loadConfig() {
-  if (!fs.existsSync(CONFIG_PATH)) {
-    console.error(`[TTS] 未找到 ${CONFIG_PATH}，请创建：`);
-    console.error(`  { "apiKey": "your-key", "voice": "auto" }`);
-    process.exit(1);
-  }
-  return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
-}
 
 function loadLines() {
   if (!fs.existsSync(LINES_PATH)) {
@@ -42,84 +29,59 @@ function loadLines() {
   return JSON.parse(fs.readFileSync(LINES_PATH, 'utf8'));
 }
 
-// ============ MiMo TTS API ============
+// ============ edge-tts ============
 
-function callTTS(text, voice, apiKey) {
+function getEdgeTtsBin() {
+  const candidates = [
+    'edge-tts',
+    'C:/Users/16560/AppData/Local/hermes/hermes-agent/venv/Scripts/edge-tts',
+    '/c/Users/16560/AppData/Local/hermes/hermes-agent/venv/Scripts/edge-tts',
+  ];
+  for (const c of candidates) {
+    try {
+      execSync(`"${c}" --help >nul 2>&1`, { shell: true });
+      return c;
+    } catch (_) {}
+  }
+  return 'edge-tts'; // 最后尝试 PATH
+}
+
+async function callEdgeTTS(text, voice, outputPath) {
   return new Promise((resolve, reject) => {
-    const data = JSON.stringify({
-      model: 'tts-1',
-      input: text,
-      voice: voice || 'alloy',
-      response_format: 'wav',
-      speed: 1.0,
+    const bin = getEdgeTtsBin();
+    const rate = process.env.TTS_RATE || '+0%';
+    const cmd = `"${bin}" --text "${text.replace(/["]/g, '\\"')}" --voice "${voice}" --rate "${rate}" --write-media "${outputPath}"`;
+    exec(cmd, { shell: true, timeout: 30000, env: { ...process.env, HTTP_PROXY: 'http://127.0.0.1:7897', HTTPS_PROXY: 'http://127.0.0.1:7897' } }, (err) => {
+      if (err) reject(err);
+      else resolve();
     });
-
-    const options = {
-      hostname: 'api.xiaomimimo.com',
-      path: '/v1/audio/speech',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Length': Buffer.byteLength(data),
-      },
-    };
-
-    // 尝试通过代理连接
-    const proxyHost = process.env.HTTP_PROXY || '127.0.0.1';
-    const proxyPort = parseInt(process.env.HTTP_PROXY?.split(':')[2] || '7897');
-
-    const req = http.request(
-      { hostname: proxyHost, port: proxyPort, method: 'CONNECT', path: 'api.xiaomimimo.com:443' },
-      (res) => {
-        if (res.statusCode !== 200) {
-          // 直连 fallback
-          const directReq = https.request(options, (directRes) => {
-            const chunks = [];
-            directRes.on('data', (c) => chunks.push(c));
-            directRes.on('end', () => resolve(Buffer.concat(chunks)));
-          });
-          directReq.on('error', reject);
-          directReq.write(data);
-          directReq.end();
-          return;
-        }
-        const httpsReq = https.request({ ...options, host: 'api.xiaomimimo.com' }, (httpsRes) => {
-          const chunks = [];
-          httpsRes.on('data', (c) => chunks.push(c));
-          httpsRes.on('end', () => resolve(Buffer.concat(chunks)));
-        });
-        httpsReq.on('error', reject);
-        httpsReq.write(data);
-        httpsReq.end();
-      }
-    );
-    req.on('error', () => {
-      // 直连 fallback
-      const directReq = https.request(options, (directRes) => {
-        const chunks = [];
-        directRes.on('data', (c) => chunks.push(c));
-        directRes.on('end', () => resolve(Buffer.concat(chunks)));
-      });
-      directReq.on('error', reject);
-      directReq.write(data);
-      directReq.end();
-    });
-    req.end();
   });
 }
 
 // ============ Main ============
 
 async function main() {
-  const config = loadConfig();
   const lines = loadLines();
 
   if (!fs.existsSync(OUTPUT_DIR)) {
     fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   }
 
-  console.log(`[TTS] 开始生成 ${lines.length} 句配音...`);
+  // 检测可用语音
+  let voice = 'zh-CN-XiaoxiaoNeural';
+  try {
+    const bin = getEdgeTtsBin();
+    const voices = execSync(`"${bin}" --list-voices`, { shell: true }).toString();
+    const zhVoices = voices.split('\n').filter(v => v.includes('zh-CN'));
+    if (zhVoices.length > 0) {
+      // 优先 Xiaochen (男声), 其次 Xiaoxiao (女声)
+      const preferred = zhVoices.find(v => v.includes('Xiaochen')) || zhVoices[0];
+      voice = preferred.trim().split(/\s+/)[0];
+    }
+  } catch (_) {}
+
+  console.log(`[TTS] 使用语音: ${voice}`);
+  console.log(`[TTS] 开始生成 ${lines.length} 句配音...\n`);
 
   let audioTags = [];
   let totalSize = 0;
@@ -133,9 +95,9 @@ async function main() {
     process.stdout.write(`  [${i + 1}/${lines.length}] "${displayText}"... `);
 
     try {
-      const audioBuffer = await callTTS(line.text, config.voice || 'alloy', config.apiKey);
-      fs.writeFileSync(filepath, audioBuffer);
-      totalSize += audioBuffer.length;
+      await callEdgeTTS(line.text, voice, filepath);
+      const stat = fs.statSync(filepath);
+      totalSize += stat.size;
 
       const duration = line.duration || Math.max(2, line.text.length * 0.12);
       audioTags.push(
@@ -143,20 +105,19 @@ async function main() {
         `data-track-index="${i}" data-has-audio="true" data-volume="1.0" src="${filepath}"></audio>`
       );
 
-      console.log(`${(audioBuffer.length / 1024).toFixed(1)}KB`);
+      console.log(`${(stat.size / 1024).toFixed(1)}KB`);
     } catch (err) {
       console.error(`失败: ${err.message}`);
     }
 
-    // API 限速，间隔 500ms
+    // 限速
     if (i < lines.length - 1) {
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, 300));
     }
   }
 
-  // 输出结果
   console.log(`\n[TTS] 完成! 总大小: ${(totalSize / 1024 / 1024).toFixed(1)}MB`);
-  console.log(`\n=== HTML <audio> 标签（粘贴到 index.html #root 内）===\n`);
+  console.log(`\n=== HTML <audio> 标签 ===\n`);
   console.log(audioTags.join('\n'));
   console.log(`\n=== BGM 标签 ===`);
   console.log(
