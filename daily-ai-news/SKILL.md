@@ -1,106 +1,146 @@
 ---
 name: daily-ai-news
 description: |
-  AI news briefing — fetches from 14 RSS/JSON sources, LLM filters for tech substance
-  (GPT/Gemini/Claude/models/tools), web-searches Chinese AI news, and delivers a categorized
-  summary with links.
+  AI news briefing v3 — fetches from 15 sources (6 RSS + 9 HTML/doc blogs), keyword filtering
+  for model releases & developer tools, web-searches Chinese AI news, delivers curated digest.
 trigger: Cron job with LLM mode + web search
 ---
 
-# Daily AI News
+# Daily AI News v3
 
-Delivers a curated AI briefing.
-Combines RSS aggregation + LLM filtering + web search for Chinese sources.
-Each run fetches only articles since the last run (incremental), avoiding duplicates.
+Delivers a **curated, filtered** AI briefing focused on what matters:
+- Model releases & updates
+- API/SDK changes
+- Developer tools
+- Open source releases
 
 ## Architecture
 
 ```
-RSS feeds (14 sources)           Web search (Chinese AI)
-        │                                │
-        ▼                                ▼
-  ai-news.py (fetch + dedup)    LLM cron prompt (filter + search + summarize)
-        │                                │
-        └─────────────┬──────────────────┘
-                      ▼
-          Categorized digest
+RSS feeds (6 sources)             HTML/doc blogs (9 sources)        Web search
+        │                                    │                              │
+        ▼                                    ▼                              ▼
+  ai-news.py (fetch + keyword filter + dedup)              LLM cron prompt (summarize + search)
+        │                                    │                              │
+        └─────────────┬──────────────────┘                              │
+                         └──────────────────────────────────────────────────┘
+                                        ▼
+                              Curated digest (~50 articles)
 ```
 
 ## How it works
 
-1. **Script** `scripts/ai-news.py` fetches 14 RSS/JSON feeds, deduplicates by URL, filters to articles **since the last run** (incremental fetching via `last_run` timestamp in tracking file), outputs JSON to stdout
-2. **LLM cron job** reads the JSON, filters for substantive AI tech news, uses `web_search` to find Chinese AI news, and writes a categorized summary
-3. **Delivery** — cron output goes directly to the configured chat
+1. **Script** `scripts/ai-news.py` fetches sources, applies **keyword filtering** (only keeps model/API/tool-related articles), deduplicates, outputs ~50 relevant articles
+2. **LLM cron job** reads the filtered JSON, summarizes, uses `web_search` for additional Chinese AI news
+3. **Delivery** — cron output goes directly to configured chat
+
+## Key Features
+
+### Smart Filtering
+- **Include keywords**: model names (GPT, Claude, Gemini, DeepSeek, Qwen, GLM, MiniMax, MiMo...), release/update terms, API/SDK, open source, benchmarks
+- **Exclude keywords**: hiring, jobs, opinions, partnerships, enterprise/commercial, politics
+- **Time window**: RSS articles from last 72 hours only
+- **Per-source limits**: Max 8-10 articles per source
+- **Target**: ~50 articles total (down from 1200+ unfiltered)
+
+### Sources (14 total)
+
+**RSS Feeds (6)**
+| Source | Max | Focus |
+|--------|-----|-------|
+| OpenAI Blog | 10 | GPT releases, API updates |
+| Google AI Blog | 10 | Gemini, PaLM updates |
+| The Verge AI | 8 | Industry news |
+| TechCrunch AI | 8 | Startup/product launches |
+| VentureBeat AI | 8 | Enterprise AI |
+| Hugging Face Papers | 8 | Daily papers |
+
+**HTML Blogs (9)**
+| Source | URL | Type | Focus |
+|--------|-----|------|-------|
+| Anthropic | anthropic.com/news | blog | Claude releases |
+| Meta AI | ai.meta.com/blog | blog | Llama releases |
+| Mistral | mistral.ai/news | blog | Mistral releases |
+| MiniMax | minimaxi.com/blog | blog | MiniMax updates |
+| Qwen | qwenlm.github.io/blog | blog | Qwen releases |
+| 智谱AI | docs.bigmodel.cn/.../new-releases | doc | GLM updates |
+| DeepSeek | api-docs.deepseek.com/zh-cn/news/... | doc | DeepSeek releases |
+| 小米MiMo | platform.xiaomimimo.com/docs/zh-CN/news/... | doc | MiMo updates |
+
+**Web Search (supplementary — vendors without public blogs)**
+- Kimi/Moonshot, 百度文心 ERNIE, 腾讯混元, 华为盘古
+- 讯飞星火, 百川智能, 阶跃星辰, 商汤日日新, 昆仑天工
+- Keywords: `AI模型 发布 更新 today`, `DeepSeek Kimi 豆包 新版本`, `36kr 机器之心 量子位`
 
 ## LLM Prompt
 
 ```
-你是一个 AI 科技资讯编辑。以下是最新的新闻数据（JSON 格式），来自多个 RSS 源，包含从上次更新到现在的增量新闻。
+你是一个 AI 科技资讯编辑。以下是经过筛选的 AI 新闻数据（30-60篇），都是与模型更新、API变更、工具发布相关的干货。
 
 你的任务：
 
-1. **筛选** — 严格保留真正有价值的 AI 技术资讯，包括：
-   - 模型发布/更新（GPT、Gemini、Claude、Llama、DeepSeek、Qwen、GLM 等）
-   - AI 工具与基础设施（Cursor、Copilot、LangChain、vLLM、Ollama 等）
-   - 重大 AI 研究突破
-   - 中国 AI 生态新闻
-   - AI 开发者平台/API 变更
-
-2. **搜索补充** — 使用 web_search 搜索今天的中文 AI 新闻：
-   - 搜索关键词："AI 新闻 today"、"大模型 发布"、"人工智能 最新"
-   - 关注：DeepSeek、通义千问、文心一言、豆包、Kimi、GLM、智谱等中国 AI 公司
-   - 搜索中国科技媒体：36kr、机器之心、量子位、AI科技评论等
-   - **重要：web_search 结果必须提取完整文章 URL（如 https://36kr.com/p/123456），不能只写主域名（如 https://36kr.com/）**
-
-3. **分类整理** — 按以下格式输出：
+1. **整理分类** — 按以下格式输出：
 
 ```
 🤖 AI 资讯速递 | {fetch_time}
 （上次更新：{last_run}）
 
-🔥 重点新闻
-（选出1-2条最重要新闻，附简短点评）
+🔥 重点发布
+（选出2-3条最重要的模型/工具发布，附简短点评）
 
-📡 模型资讯
-- [title](完整URL) — 一句话点评
+📡 模型更新
+- [title](URL) — 一句话点评
 
-🛠️ 工具与开源
-- [title](完整URL) — 一句话点评
+🛠️ 工具与API
+- [title](URL) — 一句话点评
 
 🇨🇳 国内动态
-- [title](完整URL) — 一句话点评
-
-📄 论文
-- [title](完整URL) — 一句话点评
+- [title](URL) — 一句话点评
 
 ---
-🤖 by Hermes Agent | {count} articles from RSS + Web search
+🤖 by Hermes Agent | {count} articles
 ```
 
-4. **注意事项**：
-   - **每条新闻必须有完整可点击的 URL，不能是主域名**
-   - 中英文新闻混合呈现
-   - 每条新闻一句话点评，突出技术价值
-   - 如果某类别没有新闻，省略该类别
-   - 标题使用中文，链接文字保留原文
+2. **搜索补充** — 使用 web_search 搜索：
+   - "AI模型 发布 更新 today"
+   - "DeepSeek Kimi 豆包 新版本"
+   - 关注：36kr、机器之心、量子位
+
+3. **注意事项**：
+   - 每条新闻必须有完整可点击 URL
+   - 一句话点评突出实用价值
+   - 如果某类别没有新闻，省略
 ```
 
-## Filtering criteria
+## Filtering Keywords
 
-**Include:**
-- Model releases / updates (GPT, Gemini, Claude, Llama, DeepSeek, Qwen, GLM, etc.)
-- AI tools & infrastructure (Cursor, Copilot, LangChain, vLLM, Ollama, etc.)
-- Significant AI research breakthroughs
-- Chinese AI ecosystem news
-- AI developer platform / API changes
+### Include
+```
+release, launch, announce, introducing, new model, update
+发布, 上线, 更新, 升级, 推出, 新增
+gpt, o3, o4, claude, gemini, llama, mistral, grok
+deepseek, qwen, glm, baichuan, yi, minimax, step, mimo
+doubao, kimi, hunyuan, pangu, spark, ernie, moonshot
+api, sdk, tool, platform, developer, pricing, cursor, copilot
+open source, open-source, github, huggingface, 开源
+benchmark, performance, context window, reasoning, coding
+基准, 性能, 上下文, 推理, 编程
+```
 
-**Exclude:**
-- AI music/art/culture commentary
-- Pure opinion pieces
-- General-interest social commentary about AI
-- Articles only about AI investing/business without tech substance
+### Exclude
+```
+hiring, job, career, office, expansion
+招聘, 职位, 办公, 扩张
+podcast, interview, opinion, editorial
+播客, 访谈, 观点
+sponsor, partner, collaboration
+赞助, 合作
+enterprise, 企业级, 商业化, 落地, 生态
+president, minister, government
+总统, 部长, 政府
+```
 
-## Cron job setup
+## Cron Job Setup
 
 ```bash
 hermes cron create \
@@ -111,34 +151,45 @@ hermes cron create \
   --enabled-toolsets "terminal,web,file"
 ```
 
-Schedule: configurable via cron schedule parameter.
-Script runs first → stdout injected as context → LLM processes with web search.
-Not `--no-agent` — LLM needed for filtering, summarizing, and web search.
+## Pitfalls
 
-## Sources (14 feeds)
+### HTML blogs don't have dates
+HTML blog articles don't have publish dates, so we take the first N (assuming newest first) and filter by keywords only.
 
-| Source | Format | Language |
-|--------|--------|----------|
-| OpenAI Blog | RSS | en |
-| Google AI Blog | RSS | en |
-| The Verge AI | Atom | en |
-| The Decoder | RSS | en |
-| TechCrunch AI | RSS | en |
-| VentureBeat AI | RSS | en |
-| Ars Technica AI | RSS | en |
-| MIT Tech Review AI | RSS | en |
-| Hugging Face Papers | JSON API | en |
-| arXiv cs.AI | RSS | en |
-| arXiv cs.CL | RSS | en |
-| Last Week in AI | RSS | en |
-| Synced Review | RSS | en |
-| Analytics India Mag | RSS | en |
+### Some sites need DOTALL regex
+Anthropic, Mistral, MiniMax put titles in h2/h3 tags after the href, not inline. Pattern needs `re.DOTALL` to match across newlines: `href="(/news/[^"]+)"[^>]*>.*?<h[23][^>]*>([^<]+)</h[23]>`.
+
+### DeepSeek news URL is nested
+DeepSeek's news list is at `api-docs.deepseek.com/news/news260424` (a specific article page that also lists older news), NOT at `/news`.
+
+### Most Chinese AI vendors have no public blog
+Kimi, 百度文心, 腾讯混元, 华为盘古, 讯飞星火, 百川, 阶跃, 商汤, 昆仑 — none have scrapable blog/news pages. Must use `web_search` in the LLM prompt.
+
+### Doc sidebar scraping (MiMo, DeepSeek pattern)
+Some vendors hide news in their API documentation sidebars instead of public blogs. Pattern to scrape:
+1. Fetch any doc page (e.g., `platform.xiaomimimo.com/docs/zh-CN/news/v2.5-orbit`)
+2. Extract news URLs from sidebar: look for `data-doc-nav-href` or `href` with `/news/` or `/docs/.../news/` paths
+3. Pair with title text: `href="(/docs/.../news/[^"]+)"[^>]*>.*?<p[^>]*>([^<]+)</p>` (MiMo style)
+4. Or: `href="(/(?:zh-cn/)?news/[^"]+)"[^>]*>\s*([^<]{5,100})\s*</a>` (DeepSeek style)
+5. Must use `re.DOTALL` flag since content spans multiple lines in sidebar HTML
+
+### `seen_urls` dedup bug with navigation labels
+**Critical pitfall**: When parsing HTML, if navigation labels (e.g., "English", "中文") are excluded AFTER adding URL to `seen_urls`, it blocks legitimate articles sharing the same URL. Example: DeepSeek sidebar has `English -> /news/news260424` and `DeepSeek-V4 -> /zh-cn/news/news260424` — same URL, different titles. If "English" is excluded but its URL stays in `seen_urls`, V4 gets deduped out.
+
+**Fix**: Check navigation keywords BEFORE adding to `seen_urls`, OR use `seen_urls.discard(url)` when skipping nav labels so the real article can pass.
+
+### OpenAI RSS returns all history
+OpenAI's RSS feed returns 900+ articles. We limit to 10 and filter by time (72h) + keywords.
+
+### User preference: model updates > commercial news
+User explicitly wants model release/update news, NOT commercial partnerships, enterprise deals, or expansion announcements. Keep exclude keywords tight on business/political content.
 
 ## Tracking
 
-Seen URLs and `last_run` timestamp stored at `~/.hermes/data/ai-news-seen.json`.
-The `last_run` field is updated each run to enable incremental fetching — only articles published after the last run are included. Falls back to start-of-today if no `last_run` exists.
+- Seen URLs: last 500 stored in `~/.hermes/data/ai-news-seen.json`
+- `last_run` timestamp for incremental fetching
+- Falls back to start-of-today if no `last_run`
 
-## Script reference
+## References
 
-- `scripts/ai-news.py` — Python RSS/JSON aggregator, outputs deduplicated JSON
+- `references/vendor-websites.md` — Chinese AI vendor website research (which have blogs, which need web_search)
