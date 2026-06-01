@@ -1,61 +1,59 @@
 ---
 name: short-video-gen
-description: 视频制作 — 调研→审核→脚本→生成→配音 完整工业化流水线
-argument-hint: "<视频想法>"
+description: 视频制作 — 选题评估→参数确认→信息收集→脚本设计→实现渲染，全流程带审核关卡
+argument-hint: "<视频主题描述>"
 level: 4
 ---
 
 # 视频制作
 
-用户提出想法 → AI 自主完成调研/审核/分镜/生成/TTS → 输出视频。
-
-**关键流程：先给出建议让用户决策，再执行。**
+用户提想法 → AI 走完整流程 → 输出视频。
 
 ---
 
-## 工作目录
+## 架构设计
 
-```
-D:\视频生成\<project>/
-  素材/              # 截图、图片、Logo、BGM
-  compositions/      # 分镜片段（子合成用于复杂项目）
-  index.html         # 主合成
-  rendered.mp4       # 最终视频
-```
-
----
-
-## 完整流程
+**AI负责决策和审核** → 输出结构化JSON
+**脚本负责执行** → 根据JSON生成HyperFrames代码、TTS对轨等
 
 ```
 用户提想法
     │
     ▼
-Stage 0  选题评估   竞品调研 → 选题分析 → 用 AskUserQuestion 确认
+Stage 0  选题评估   竞品调研 + 卖点分析 + 流量预估 + 用户确认
     │
     ▼
-Stage 1  参数确认   给出建议 → AskUserQuestion 让用户决策（时长/风格/比例/BGM/TTS）
+Stage 1  参数确认   用 AskUserQuestion 逐一确认视频规格，汇总打印
     │
     ▼
-Stage 2  信息收集   kimi-webbridge 深度调研 + 素材收集 + 数据核实
+Stage 2  信息收集   深度调研 + 素材收集 + 数据核实
     │
     ▼
-Gate 2   素材审核   ≥5文件？有logo？有主视觉？数据有来源？→ 不通过打回
+Gate 2   素材审核   6 项检查，不通过打回 Stage 2（标注缺什么）
     │
     ▼
-Stage 3  脚本设计   分镜表 + 画面描述 + 素材关联 + 视觉动画方案
+Stage 3  脚本设计   分镜表 + 每场景素材/文字/动画/时长
     │
     ▼
-Gate 3   方案审核   一条主线？前3秒钩子？素材全覆盖？布局多样性？→ 不通过打回
+Stage 3.5 动画设计   每个场景的入场/强调/退场动画 + 视觉风格
     │
     ▼
-Stage 4  实现渲染   HTML + CSS + GSAP + 可用组件 → check → render
+Stage 3.6 对轨设计   生成TTS → 计算时长 → 调整场景时间轴
     │
     ▼
-Gate 4   最终审核   技术质量 + 内容质量 → 不通过回修
+Gate 3   方案审核   5 项检查 + 对轨审核，不通过打回 Stage 3（标注改哪里）
     │
     ▼
-Stage 5  音频合成   TTS 配音（可选）+ BGM 混音
+Stage 4  输出JSON   结构化视频数据（scenes/animations/audio）
+    │
+    ▼
+Stage 5  代码生成   脚本根据JSON生成HyperFrames HTML
+    │
+    ▼
+Stage 6  渲染输出   hyperframes render → MP4
+    │
+    ▼
+Gate 4   最终审核   技术 + 内容，不通过回对应阶段
     │
     ▼
 rendered.mp4
@@ -65,573 +63,426 @@ rendered.mp4
 
 ## Stage 0: 选题评估
 
+用户提出想法后，先分析值不值得做。
+
 ### 0.1 竞品调研
 
-WebSearch 搜同类内容，了解：
-- 同类最高播放量（天花板在哪）
-- 常见角度和切入点
-- 评论区的未满足需求
-- 我们的差异化空间
+Web 搜索同类内容，收集真实数据：
+
+```
+搜 B站：site:bilibili.com <关键词>
+搜抖音：site:douyin.com <关键词>
+搜 YouTube：site:youtube.com <关键词>
+```
+
+提取：同类最高播放量、常见角度、优缺点、评论区观众的未满足需求。
 
 ### 0.2 选题分析
 
 - **一句话卖点**：看完能获得什么？
 - **目标受众**：谁看？什么场景看？
-- **差异化**：和同类有什么不同？
-- **流量潜力**：话题性强？适合传播？
+- **差异化**：和同类内容有什么不同？
+- **流量潜力**：有人搜这个话题吗？适合传播吗？
 - **执行可行性**：素材能收集到吗？
 
 ### 0.3 用户确认
 
-用 `AskUserQuestion` 给出分析并确认方向。
+用 `AskUserQuestion` 确认方向：
+
+```
+"我的分析：[简述卖点+受众+差异化]。这个方向可以吗？"
+选项：[1] 可以，继续 [2] 换个角度 [3] 我再想想
+```
 
 ---
 
 ## Stage 1: 参数确认
 
-**先给出建议，再用 AskUserQuestion 让用户决策。**
-
-必须确认的参数（缺什么问什么）：
+用 `AskUserQuestion` 逐一确认。用户说"你定"就跳过该项。
 
 ```
-视频时长：[建议具体值] → [1] AI判断 [2] 15s [3] 30s [4] 60s [5] 自定义
-视觉风格：[建议具体风格] → 10种配色可选 + AI推荐
-视频比例：[建议具体比例] → [1] 1920×1080 横屏 [2] 1080×1920 竖屏 [3] 其他
+时长：[1] AI 判断 [2] 15s [3] 30s [4] 60s [5] 自定义
+
+视觉风格：
+  [1] AI 推荐 [2] 赛博朋克 [3] 极简白 [4] 暗金 [5] 活力橙蓝
+  [6] 暗夜绿 [7] 霓虹粉紫 [8] 纯黑暴力 [9] 暖橘日落 [10] 冰川蓝
+
+视频比例：[1] 1920×1080 [2] 1080×1920 [3] 其他
+
 BGM：[1] 自动合成 [2] 不加 [3] 手动提供
-TTS：[1] 不加 [2] edge-tts（免费） [3] 小米 MiMo（需 API Key）
+TTS：[1] 不加 [2] 小米 MiMo（需 API Key）
 ```
 
-确认完毕后打印汇总。
+确认完毕后，打印汇总让用户过目。
 
 ---
 
 ## Stage 2: 信息收集
 
-按题材类型深度调研：
+**不全不进 Stage 3。**
+
+### 按类型调研
 
 **网站/产品/服务**（kimi-webbridge）：
 - 首页、关于、功能、定价、联系——逐个页面截图
-- 提取真实数据（用户数、年份、slogan）
-- 下载 logo，记录所有可用文案
+- 提取真实数据（用户数、年份、规模、slogan）
+- 下载 logo，记录可用文案
 - 有 Demo 的打开截图
 
 **开源项目**：
-- 读 README，提取功能/技术栈/场景
-- 下载官方截图/Logo（assets/目录）
-- 获取 Stars/Forks/License 等真实数据
+- 读 README 提取功能、技术栈、使用场景
+- 下载官方截图/Logo（GitHub `assets/` 目录）
+- 获取真实数据（Stars/Forks/License）
+- 有官网的去截图
 
-**游戏/影视/文化**：搜 Google Images/壁纸站，≥5张不同高清图
+**游戏/影视/文化**：
+- kimi-webbridge 搜 Google Images/壁纸站，下载官方海报、角色图、场景截图
+- Web 搜索收集评分、获奖、名场面、经典台词
+- ≥5 张不同内容的高清图
 
-**数据核实**：所有数字必须有来源，不确定的不用。
+**教程/操作指南**：
+- kimi-webbridge 实际操作流程，每步截图
+
+### 数据核实
+
+所有引用数字必须有来源。不确定的宁可不用，不可瞎编。
 
 ---
 
 ### Gate 2: 素材审核
 
-```
-□ 素材 ≥5 个不同文件？
-□ 不同内容方向？（不是同一张图反复用）
-□ 有高清主视觉？（能全屏铺满的）
-□ 有 logo？
-□ 关键数据有来源？
-□ 现有素材能覆盖每个场景？
-```
+不通过时标注具体缺什么，打回 Stage 2：
 
-不通过标注缺什么，打回 Stage 2。
+```
+□ 素材数量：≥5 个不同文件？
+  → 缺：______
+□ 素材多样性：不同页面/角度/内容？（不是同一张图反复用）
+  → 缺：______
+□ 有高清主视觉图吗？（能全屏铺满的）
+□ 有 logo 吗？
+□ 关键数据有来源吗？（不是编的）
+  → 可疑项：______
+□ 现有素材能覆盖每个场景吗？（N 个场景需要 N 张不同的图）
+```
 
 ---
 
 ## Stage 3: 脚本设计
 
-产出分镜表：
+产出分镜表，每行一个场景：
 
-| # | 时间 | 素材 | 画面描述 | 画面文字 | 动画/特效 |
-|---|------|------|---------|---------|----------|
-| 1 | 0-4s | hero.png | 全屏蒙层+大字 | "X" | 模糊reveal |
+| # | 时间 | 素材 | 画面描述 | 文字 | 动画 |
+|---|------|------|---------|------|------|
+| 1 | 0-4s | hero.jpg | 全屏蒙层+大字 | "XXX" | 模糊 reveal |
+| 2 | ... | ... | ... | ... | ... |
 
 要求：
-- 前3秒有钩子（反常识/大数字/痛点/好奇）
-- 每场景用不同素材
+- 前 3 秒有钩子（反常识/数字冲击/痛点/好奇）
+- 每场景用不同素材图
 - 相邻场景布局不重复
-- 每个场景指定所用素材
+- 每屏文字简短有力
 
 ---
 
-### Gate 3: 方案审核
+## Stage 3.5: 动画设计
+
+为每个场景设计具体的动画效果：
+
+### 动画类型库
+
+**入场动画**：
+- `fadeIn` - 淡入
+- `slideInLeft` - 从左滑入
+- `slideInRight` - 从右滑入
+- `slideInUp` - 从下滑入
+- `scaleIn` - 缩放进入
+- `blurIn` - 模糊进入
+- `typewriter` - 打字机效果
+
+**强调动画**：
+- `pulse` - 脉冲缩放
+- `shake` - 抖动
+- `glow` - 发光
+- `bounce` - 弹跳
+
+**退场动画**：
+- `fadeOut` - 淡出
+- `slideOutLeft` - 向左滑出
+- `slideOutRight` - 向右滑出
+- `scaleOut` - 缩放退出
+- `blurOut` - 模糊退出
+
+### 设计输出格式
 
 ```
-□ 一句话说得清视频讲什么吗？
-□ 前3秒够强吗？
-□ 每个场景都指定了素材？
-□ 场景布局有变化（≥3种）？
-□ 符合用户确认的参数和方向？
-```
+场景1：
+- 入场：文字从下方 slideInUp，持续0.5s
+- 强调：标题 pulse 缩放1.2倍，持续0.3s
+- 退场：整体 fadeOut，持续0.3s
 
-不通过标注改哪里，打回 Stage 3。
+场景2：
+- 入场：背景从左向右滑入
+- 强调：关键词 glow 发光
+- 退场：整体 blurOut
+```
 
 ---
 
-## Stage 4: 实现渲染
+## Stage 3.6: 对轨设计
 
-### 视觉特效系统（按需使用）
+**TTS和视频必须同步。**
 
-HyperFrames 提供 50+ 现成组件：
+### 流程
 
-```bash
-npx hyperframes add <block-name>
-```
+1. **生成TTS音频**
+   - 把所有旁白文本写入 `tts-input.txt`
+   - 调用小米MiMo TTS生成音频
+   - 保存为 `voiceover.wav`
 
-**推荐组件**：
+2. **计算每句话时长**
+   - 分割音频为单独的句子
+   - 计算每句的开始时间和结束时间
+   - 输出 `timing.json`
 
-| 场景类型 | 推荐组件 |
-|---------|---------|
-| 开场/标题 | `kinetic-slam`、`glitch-rgb`、`neon-glow` |
-| 数据展示 | `data-chart`、`shimmer-sweep`、`texture-mask-text` |
-| 关键词强调 | `emoji-pop`、`particle-burst`、`highlight` |
-| 过渡转场 | 20+ 种 shader transitions 可选 |
-| 截图/产品 | `parallax-zoom`、`parallax-unzoom` |
-| 结尾 CTA | `logo-outro`、`pill-karaoke` |
+3. **调整场景时间轴**
+   - 每个场景的 `data-start` 和 `data-duration` 必须匹配语音
+   - 如果语音比场景长，延长场景
+   - 如果语音比场景短，缩短场景或添加停顿
 
-### 官方项目文件和流程（来自 HyperFrames launch video）
+4. **生成时间轴JSON**
+   ```json
+   {
+     "scenes": [
+       {
+         "id": "scene-1",
+         "text": "每天重复的事",
+         "start": 0,
+         "duration": 2.5,
+         "voiceStart": 0,
+         "voiceEnd": 2.5
+       }
+     ]
+   }
+   ```
 
-复杂项目建议维护以下文档（参考官方团队做法）：
+### 注意事项
 
-```
-SCRIPT.md      # 配音脚本（VO 原文，供 TTS/录音用）
-STORYBOARD.md  # 分镜表 + 视觉描述
-HANDOFF.md     # 每次迭代的生产日志（改了什么、为什么、验证方法）
-```
+- 场景切换要在句子结束前0.2秒开始，避免突兀
+- 相邻场景有0.1秒重叠，实现平滑过渡
+- 如果场景没有配音，设置固定时长（建议3-4秒）
 
-**脚本格式示例：**
-```markdown
-## Spoken VO
+---
 
-Spoken lines only. This block feeds TTS verbatim.
-```
-Imagine you could make videos like this.
-Your agent already can — just give it HyperFrames.
-Open source. HTML in, video out.
-```
-```
+## Gate 3: 方案审核
 
-### 官方已验证的子合成时间线修复
-
-HyperFrames 官方团队在 launch video 中遇到了完全相同的黑帧问题。
-**根因：** 框架由 `timeline.duration()` 决定可见性，不是 `data-duration`。
-**修复：** 每个子合成末尾填充时间线。
-
-```javascript
-tl.to({}, { duration: MASTER_SLOT_DURATION }, 0);
-window.__timelines["composition-id"] = tl;
-```
-
-**验证方法**（官方提供，在浏览器控制台运行）：
-```javascript
-const p = document.querySelector('hyperframes-player');
-const iw = p.shadowRoot.querySelector('iframe').contentWindow;
-Object.fromEntries(Object.entries(iw.__timelines).map(([k,v]) => [k, +v.duration().toFixed(4)]));
-```
-
-任何 `timeline.duration() < master slot data-duration` 的合成都会出现黑帧。
-
-### HyperFrames 组件库（62 个块 + 23 个组件）
-
-安装：`npx hyperframes add <name>`
-
-**过渡效果块（33 个）** — 场景切换，4s 时长：
-`flash-through-white` `cinematic-zoom` `glitch` `cross-warp-morph` `domain-warp-dissolve`
-`ridged-burn` `ripple-waves` `gravitational-lens` `swirl-vortex` `light-leak` `whip-pan`
-`transitions-blur` `transitions-dissolve` `transitions-distortion` `transitions-push`
-
-**文字动效组件（16 个）** — 叠加在子合成中：
-`caption-kinetic-slam`(全屏大字交替进入) `caption-particle-burst`(关键词粒子爆炸)
-`caption-glitch-rgb`(RGB故障) `caption-neon-glow`(霓虹辉光) `caption-matrix-decode`(矩阵解码)
-`caption-emoji-pop`(表情弹出) `caption-weight-shift`(字重动画)
-
-**电影级叠加组件（4 个）** — 直接 paste 到 HTML：
-`grain-overlay`(胶片颗粒) `vignette`(暗角晕影) `shimmer-sweep`(光泽扫描)
-`texture-mask-text`(纹理遮罩文字)
-
-**数据可视化块（8 个）**：`data-chart` `world-map` `us-map` `flowchart`
-**社交/UI 叠加块（11 个）**：`instagram-follow` `tiktok-follow` `yt-lower-third` `x-post`
-**VFX 特效块（10 个）**：`vfx-shatter` `vfx-portal` `vfx-magnetic` `logo-outro`
-
-### 子合成（复杂项目标准模式）
-
-多场景视频应拆分为独立合成文件，用 `data-composition-src` 编排。
-
-**推荐项目结构：**
-```
-project/
-├── index.html            # 编排器：音频 + 子合成插槽 + 空时间线
-├── compositions/
-│   ├── scene-1-hook.html
-│   ├── scene-2-features.html
-│   └── scene-3-cta.html
-├── assets/
-│   └── fonts/
-└── renders/
-```
-
-**父合成（index.html）：**
-```html
-<div id="master" data-composition-id="master" data-start="0" data-duration="60"
-     data-width="1080" data-height="1920">
-  <audio src="bgm.mp3" class="clip" data-start="0" data-duration="60"
-         data-track-index="40" data-has-audio="true" data-volume="0.06"></audio>
-
-  <div data-composition-id="scene1" data-composition-src="compositions/scene-1-hook.html"
-       data-start="0" data-duration="8" data-track-index="1"></div>
-  <div data-composition-id="scene2" data-composition-src="compositions/scene-2-features.html"
-       data-start="8" data-duration="12" data-track-index="1"></div>
-</div>
-
-<script>
-window.__timelines = window.__timelines || {};
-window.__timelines["master"] = gsap.timeline({ paused: true });  // 空时间线
-</script>
-```
-
-**子合成（compositions/scene-1-hook.html）：**
-```html
-<template id="scene1-template">
-<div data-composition-id="scene1" data-width="1080" data-height="1920"
-     data-start="0" data-duration="8">
-  <!-- 场景内容 -->
-</div>
-<style>
-  [data-composition-id="scene1"] { /* 作用域样式 */ }
-</style>
-</template>
-<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
-<script>
-window.__timelines = window.__timelines || {};
-var tl = gsap.timeline({ paused: true });
-tl.from("#title", { opacity: 0, y: 80, duration: 0.6 }, 0);
-
-// ⚠️ 关键：填充时间线到 data-duration，否则框架会提前隐藏（黑帧）
-tl.to({}, { duration: 8 }, 0);
-window.__timelines["scene1"] = tl;
-</script>
-```
-
-### 子合成时间线规则 ⚠️
-
-HyperFrames 根据 GSAP `.duration()` 决定可见性。如果 `tl.duration()` < `data-duration`，框架提前 `visibility:hidden` → **黑帧**。
-
-```javascript
-// ✅ 填充到完整插槽时长（两种方式均可）
-tl.to({}, { duration: 8 }, 0);  // 空对象补间
-tl.set({}, {}, 8 * 30);         // 或延长到最后一帧（30fps）
-
-// ❌ tl.duration()=4s, 父级 data-duration=8 → 后4s黑屏
-```
-
-验证（浏览器控制台）：
-```javascript
-Object.fromEntries(
-  Object.entries(window.__timelines).map(([k,v]) => [k, +v.duration().toFixed(4)])
-);
-```
-
-### GSAP 缓动函数映射
-
-用自然语言描述动画感觉：
-
-| 描述 | GSAP easing | 适合场景 |
-|-----|------------|---------|
-| 流畅 | `power2.out` | 默认，通用入场 |
-| 利落 | `power4.out` | 快速切换、数据变化 |
-| 弹性 | `back.out(1.5)` | 数字弹出、CTA 按钮 |
-| 弹簧 | `elastic.out(1,0.3)` | 强调、趣味元素 |
-| 戏剧性 | `expo.out` | 大字标题、reveal |
-| 梦幻 | `sine.inOut` | 淡入淡出、呼吸动画 |
-
-### 快速迭代工作流
-
-```bash
-npx hyperframes render --quality draft   # 草稿模式（CRF 28，1-3min）
-ffmpeg -ss 5 -i renders/draft.mp4 -frames:v 1 frame_5s.png  # 检查某一帧
-npx hyperframes render                   # 最终渲染
-```
-
-### 音频轨道编号约定
-
-| 范围 | 用途 |
-|-----|------|
-| 0 | 画外音/VO |
-| 40+ | BGM |
-| 80+ | 音效 |
-| 90+ | 字幕叠加 |
-
-### 嵌入方法
-
-```html
-<!-- 组件：直接贴到 #root 内 -->
-<div id="grain-overlay"><div class="grain-texture"></div></div>
-<div id="hf-vignette"></div>
-
-<!-- 块：data-composition-src 嵌入子合成 -->
-<div data-composition-src="compositions/flash-through-white.html"
-     data-duration="4" data-width="1080" data-height="1920"></div>
-```
-
-### 使用经验
-
-- `grain-overlay` + `vignette` 是"必加"组合，零配置提升观感
-- caption 组件在子合成中使用
-- 过渡块默认 1920×1080，竖屏要改成 1080×1920
-- `timeline_track_too_dense` 警告说明该拆子合成了
-
-## 竖屏 (9:16) 设计原则 ⚠️ 关键
-
-竖屏 (1080×1920) 和横屏 (1920×1080) 是完全不同的设计范式。
-**绝对不能把横屏缩小当竖屏用。**
-
-### 核心理念
-
-| 横屏思维 ❌ | 竖屏思维 ✅ |
-|-----------|-----------|
-| 左右分栏 | 上下堆叠 |
-| 水平多列卡片 | 单列/全幅卡片 |
-| 文字 40-48px | 文字 80-145px |
-| 高信息密度 | 每屏少但大 |
-| 横向滑动入场 | 纵向滑动入场 |
-| 元素左右排列 | 元素纵向排列 |
-
-### 安全区（Safe Zones）
-
-竖屏视频在 TikTok/Reels/Shorts 会被 UI 遮挡：
+不通过标注改哪里，打回 Stage 3：
 
 ```
-┌──────────────────────┐
-│  ░░░ 顶部遮挡 260px ░░░│  ← 头像、用户名、标题
-│                        │
-│   ┌──────────────┐   │
-│   │  核心安全区    │   │  ← x:90~990, y:260~1660
-│   │  ~900×1400px  │   │     所有关键内容放这里
-│   └──────────────┘   │
-│                        │
-│  ░░░ 底部遮挡 340px ░░░│  ← 字幕、点赞、操作按钮
-└──────────────────────┘
+□ 一句话能说清这个视频讲什么吗？
+  → 说不清说明：______
+□ 前 3 秒够强吗？
+□ 每个场景都指定了素材吗？
+□ 场景布局有变化吗（≥3 种）？
+□ 符合 Stage 0-1 确认的方向和参数吗？
+
+【新增】对轨审核：
+□ TTS音频时长和场景时长匹配吗？
+□ 每句话的开始/结束时间和场景切换对得上吗？
+□ 有没有语音还没说完就切场景的情况？
+□ 有没有场景等太久才开始说话的情况？
 ```
 
-- **顶部 260px 不要放关键信息**
-- **底部 340px 只放字幕/CTA**
-- **核心内容限制在 900×1400 区域内**
-- **左右侧让出 90px**
+---
 
-### 竖屏排版规范
+## Stage 4: 输出JSON
 
-| 元素 | 字号 | 行高 | 每行字数 | 最多行数 |
-|-----|------|------|---------|---------|
-| **主标题（冲击力）** | 110-145px | 110% | ≤10字 | 2行 |
-| **章节标题** | 80-96px | 120% | ≤15字 | 2行 |
-| **副标题/标签** | 55-65px | 120% | ≤20字 | 1行 |
-| **正文/描述** | 40-55px | 120% | ≤20字 | 3行 |
-| **底部字幕** | 40-55px | 120% | ≤25字 | 2行 |
-| **标注数字** | 130-180px | 90% | ≤6字 | 1行 |
+AI决策完成后，输出结构化JSON：
 
-### 竖屏布局模式（取代横屏方案）
-
-竖屏只有垂直空间可用，所有布局应围绕"从上往下看"设计：
-
-```
-[类型 A] 全屏视觉 + 居中大字        — 开场/钩子/CTA
-┌─────────────────┐
-│   全屏背景图      │
-│                   │
-│    大字标题       │  ← 居中
-│                   │
-└─────────────────┘
-
-[类型 B] 上标题 + 下内容             — 功能/描述/产品
-┌─────────────────┐
-│  标签/小标题      │  ← y:100-260
-├─────────────────┤
-│                   │
-│  图片/截图         │  ← 核心区域
-│  (全幅宽度)        │
-│                   │
-├─────────────────┤
-│  底部说明文字      │  ← 安全区内
-└─────────────────┘
-
-[类型 C] 垂直卡片列表（单列）        — 功能罗列/卖点
-┌─────────────────┐
-│  标题             │
-├─────────────────┤
-│  ▓ 卡片 1         │  ← 全幅宽度
-├─────────────────┤
-│  ▓ 卡片 2         │
-├─────────────────┤
-│  ▓ 卡片 3         │
-└─────────────────┘
-
-[类型 D] 大数字 + 底部说明           — 数据冲击
-┌─────────────────┐
-│                   │
-│                   │
-│    130,000        │  ← 超大字居中
-│                   │
-│    GitHub Stars    │  ← 小字说明
-│                   │
-└─────────────────┘
-
-[类型 E] 垂直对比（上/下分栏）       — 对比
-┌─────────────────┐
-│  ❌ 传统方案      │
-│  缺点描述...      │
-├─────────────────┤
-│  ✅ 我们的方案     │
-│  优点描述...      │
-└─────────────────┘
-```
-
-### 竖屏 GSAP 动画规则
-
-- **优先 y 轴动画**（竖向滑动），x 轴在窄画布上很挤
-- 禁止 `x: -100` 这种横向大幅位移
-- `x: -30` 以内的微偏移可以接受（icon/标签入场）
-- **zoom/scale 放大**在竖屏效果好
-- **blur in**（模糊变清晰）适合大字标题
-- 元素从下方滑入比从侧面更自然
-
-```javascript
-// ✅ 竖屏推荐
-tl.from("#title", { opacity: 0, y: 80, duration: 0.6 });
-tl.from("#number", { opacity: 0, scale: 0.4, duration: 0.5 });
-tl.from("#subtitle", { opacity: 0, filter: "blur(10px)", duration: 0.5 });
-
-// ❌ 竖屏避免
-// tl.from("#card", { x: -200, ... });  // 画布才1080宽，200px太猛
-```
-
-### 素材使用规则
-
-- 背景图/视频必须 `object-fit: cover` 填满 1080×1920
-- 产品截图/Logo 最多占画幅 60% 宽度（~650px），居中
-- 人物/主体置于画面中心（上下居中）
-- 图片下方留足够空间给文字
-
-### 复杂项目建议用子合成
-
-场景较多时用 `data-composition-src` 拆分：
-
-```html
-<div id="scene1" data-composition-id="intro" data-composition-src="compositions/intro.html"
-     data-start="0" data-duration="10" data-track-index="1"></div>
-```
-
-### 字幕/文字叠加
-
-使用底部 caption + backdrop-filter 更专业。竖屏字幕 44-55px，横屏 32-40px：
-
-```css
-/* 竖屏使用 */
-.caption {
-  position: absolute; bottom: 180px; left: 50%; transform: translateX(-50%);
-  padding: 16px 40px; border-radius: 16px;
-  background: rgba(0,0,0,0.55); backdrop-filter: blur(8px);
-  color: rgba(255,255,255,0.92); font-size: 44px; text-align: center;
-  white-space: nowrap;
+```json
+{
+  "project": {
+    "name": "hermes-intro",
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "duration": 40
+  },
+  "style": {
+    "theme": "cyberpunk",
+    "colors": {
+      "primary": "#00d4ff",
+      "secondary": "#1a1a2e",
+      "accent": "#ff4444",
+      "background": "#0a0a0a"
+    },
+    "font": {
+      "main": "system-ui",
+      "size": {
+        "title": 72,
+        "subtitle": 48,
+        "caption": 36
+      }
+    }
+  },
+  "scenes": [
+    {
+      "id": "scene-1",
+      "name": "痛点引入",
+      "start": 0,
+      "duration": 4,
+      "background": "linear-gradient(135deg, #1a1a2e, #16213e)",
+      "elements": [
+        {
+          "type": "text",
+          "id": "title-1",
+          "content": "每天重复的事",
+          "position": { "x": "center", "y": "center" },
+          "style": {
+            "fontSize": 72,
+            "fontWeight": "bold",
+            "color": "white",
+            "textAlign": "center"
+          },
+          "animation": {
+            "enter": { "type": "scaleIn", "duration": 0.5 },
+            "exit": { "type": "fadeOut", "duration": 0.3 }
+          }
+        }
+      ]
+    }
+  ],
+  "audio": {
+    "enabled": false,
+    "tts": {
+      "provider": "xiaomi-mimo",
+      "voice": "Chloe",
+      "text": "每天重复的事...",
+      "segments": []
+    }
+  }
 }
 ```
 
-### 渲染
+---
+
+## Stage 5: 代码生成
+
+脚本根据JSON生成HyperFrames HTML代码：
 
 ```bash
-npx hyperframes render --quality draft   # 快速迭代（CRF 28，1-3min）
-npx hyperframes render                   # 最终渲染（标准质量）
-cp renders/*.mp4 ../rendered.mp4
+python3 ~/.hermes/skills/N0tsSkills/short-video-gen/scripts/generate.py video-spec.json
 ```
 
-也可以用 `npm run check && npm run render` 一条命令跑完整流程。
+脚本自动处理：
+- HTML结构生成
+- CSS样式注入
+- GSAP动画配置
+- HyperFrames时间轴注册
+- 音频元素（如果有）
 
 ---
 
-### Gate 4: 最终审核
-
-```
-□ npm run check 输出 0 error？
-□ 正常播放？无卡帧/花屏/黑屏？
-□ 竖屏布局符合安全区规范？
-□ 每个场景有独立布局（非重复）？
-□ 前3秒钩子到位？
-□ 配音/字幕时间轴对齐？
-□ BGM 音量不盖过配音？
-```
-
-任一不通过回修对应 Stage。
-
----
-
-## Stage 5: 音频合成
-
-### 配音（TTS）
-
-用 `tts-generate.js` 模块自动生成。
-
-1. 从脚本台词提取 **tts-lines.json**：
-   ```json
-   [{ "text": "每次聊天都像第一次见面", "start": 0.5, "duration": 2.5 }]
-   ```
-
-2. 执行生成（默认 edge-tts，免费）：
-   ```bash
-   pip install edge-tts
-   node tts-generate.js
-   ```
-
-3. 生成的 `<audio>` 标签粘贴到 `index.html` 的 `#root` 中
-
-edge-tts 可用中文语音：`zh-CN-YunyangNeural`（男声专业）
-也可用小米 MiMo（需 API Key）：`node tts-generate.js --mimo`
-
-**注意**：每个 audio 标签必须有唯一 `id`，否则渲染器不会发现 → 静音。
-
-### BGM
+## Stage 6: 渲染输出
 
 ```bash
-# 合成简单 BGM（FFmpeg 正弦波 + 粉噪）
-ffmpeg -f lavfi -i "sine=frequency=220:duration=60" -f lavfi -i "anoisesrc=d=60:c=pink:a=0.02" \
-  -filter_complex "[0]volume=0.3[a];[1]volume=0.5[b];[a][b]amix=inputs=2:duration=first" \
-  assets/bgm.mp3
+cd <project-dir>
+hyperframes render --output rendered.mp4
 ```
-
-BGM 音量 `data-volume="0.06-0.08"`，VO 音量 `data-volume="1.0"`。
 
 ---
 
-## 实践经验
+## Stage 7: 最终审核
 
-- **数据核实**：去官方渠道确认，不编数字
-- **HyperFrames 可见性**：`data-start/duration` 管显示/隐藏，GSAP 只做动画
-- **浮点精度**：duration = nextStart - currentStart - 0.02
-- **必跑 check**：检查 overlap/溢出
-- **素材先行**：素材不够不写 HTML，否则=幻灯片
-- **块组件**：`npx hyperframes add <name>` 安装现成特效块
-- **竖屏横屏不通用**：竖屏是独立设计范式，不能把横屏缩小当竖屏用
-- **场景转场**：白闪过渡最简单高效——`tl.to(opacity:0) → tl.set(flash) → tl.to(flash:0) + tl.set(hard kill)`
-- **动效点缀**：关键数字用 `boxShadow` 脉冲发光，截图用 `filter:brightness()` 呼吸，关键词用金色渐变 + `textShadow` 辉光
-- **GSAP 硬重置**：每个 clip 结束边界必须加 `tl.set()`，否则非线性 seek 会留脏状态
-- **`flash-overlay` 要素**：需要 `class="clip"` + `data-track-index`（高于 scenes 低于 overlays）
+播放视频，检查：
+
+```
+□ 视频能正常播放？无卡帧/花屏/黑屏？
+□ 内容符合 Stage 3 的设计方案？
+□ 动画效果流畅吗？
+□ 作为观众，觉得这视频好看吗？
+  → 不好看的原因：______
+```
+
+---
 
 ## 工具 & 环境
 
-- **kimi-webbridge**（浏览器调研）：`127.0.0.1:10086`，需要 Chrome 扩展（ID: `fldmhceldgbpfpkbgopacenieobmligc`）
-- **HyperFrames**：`npx hyperframes`（init / preview / check / render / add）
-- **FFmpeg**：BGM 合成（正弦波 + 粉噪）
-- **小米 MiMo TTS**：`api.xiaomimimo.com/v1`，OpenAI 兼容接口
-- **Node.js** ≥ 22
-- **代理**（Clash）：`127.0.0.1:7897`
+kimi-webbridge · HyperFrames · FFmpeg · 小米 MiMo TTS
+Node.js ≥ 22 · FFmpeg · Python 3.x
+
+## 参考文件
+
+- `references/hyperframes-pitfalls.md` - HyperFrames常见错误及修复
+- `references/gsap-patterns.md` - GSAP动画模式库
+- `templates/video-spec-template.json` - 视频配置JSON模板
+- `scripts/generate.py` - 根据JSON生成HyperFrames HTML的脚本
+
+---
 
 ## HyperFrames 速查
 
 ```html
-<div class="clip" data-start="0" data-duration="5" data-track-index="10">
+<div class="clip" data-start="0" data-duration="5.0" data-track-index="10">
 ```
 - GSAP `paused:true` → `window.__timelines["main"]`
-- orb 不同 track-index
-- `tl.set()` hard kill
-- 不用 `Math.random()` / `Date.now()`
+- orb 不同 track-index 避免 overlap
+- `tl.set()` hard kill，不用 `Math.random()`/`Date.now()`
+
+---
+
+## 常见问题
+
+### TTS和视频不同步
+- **原因**：没有对轨，直接用固定时长
+- **解决**：Stage 3.6 必须计算每句话时长，调整场景时间轴
+
+### 动画效果差
+- **原因**：只用了简单的opacity渐显渐隐
+- **解决**：Stage 3.5 必须设计具体动画效果（缩放、位移、模糊等）
+
+### HyperFrames渲染失败
+- **原因**：HTML模板不符合要求
+- **解决**：用脚本生成，不要手写HTML
+
+---
+
+## Pitfalls（踩坑记录）
+
+### HyperFrames HTML必须包含的属性
+- `data-composition-id` - 必须在根元素上
+- `data-width` 和 `data-height` - 必须在根元素上
+- `data-start="0"` - 必须在根元素上
+- `window.__timelines[compositionId]` - 必须注册timeline
+- `window.__hf = { duration, seek }` - 必须暴露给HyperFrames
+
+### GSAP动画限制
+- **禁止 `repeat: -1`**（无限循环）：HyperFrames无法处理，会报错
+- 有限次数用 `repeat: Math.floor(duration / cycleDuration) - 1`
+- 选择器必须用字符串形式 `'#element-id'`，不能用私有字段语法
+
+### 动画代码生成模式
+```javascript
+// 正确：用tl.add()添加动画到timeline
+tl.add(() => { gsap.fromTo('#title', {opacity: 0}, {opacity: 1, duration: 0.5}) }, startTime);
+
+// 错误：直接在timeline方法中使用复杂动画
+tl.to('#title', { /* 动画参数 */ });  // 这样会导致时序问题
+```
+
+### 常见渲染错误及修复
+1. **`window.__hf not ready`** - 检查是否正确暴露了window.__hf
+2. **`Private field must be declared`** - 选择器用了#id语法但没加引号
+3. **`gsap_infinite_repeat`** - 把repeat: -1改为有限次数
+4. **`root_missing_dimensions`** - 根元素缺少data-width/data-height
+5. **`missing_timeline_registry`** - 忘记注册window.__timelines
+
+### 视频效果差的根因
+- ❌ 只用opacity渐显渐隐 = 幻灯片效果
+- ✅ 必须组合使用：缩放(scale) + 位移(translate) + 模糊(blur) + 发光(glow)
+- ✅ 每个场景至少3种动画：入场、强调、退场
+- ✅ 相邻场景用不同动画类型，避免重复
+
+### AI决策 → 代码生成的架构
+- AI只负责：选题、脚本、动画设计、审核
+- 脚本负责：HTML生成、动画代码、时间轴计算
+- 不要让AI直接写HTML/CSS/JS代码，容易出错
