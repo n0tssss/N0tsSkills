@@ -1,31 +1,33 @@
 ---
 name: daily-ai-news
 description: |
-  AI news briefing v3 — fetches from 15 sources (6 RSS + 9 HTML/doc blogs), keyword filtering
-  for model releases & developer tools, web-searches Chinese AI news, delivers curated digest.
+  AI news briefing v4 — fetches from 18+ sources (6 RSS + 8 HTML + HN + GitHub Trending + GitHub Ecosystem),
+  keyword filtering for model releases & developer tools, web-searches Chinese AI news, delivers curated digest.
 trigger: Cron job with LLM mode + web search
 ---
 
-# Daily AI News v3
+# Daily AI News v4
 
 Delivers a **curated, filtered** AI briefing focused on what matters:
 - Model releases & updates
 - API/SDK changes
-- Developer tools
+- Developer tools & coding agents
 - Open source releases
+- Community trends & hot discussions
 
 ## Architecture
 
 ```
-RSS feeds (6 sources)             HTML/doc blogs (9 sources)        Web search
-        │                                    │                              │
-        ▼                                    ▼                              ▼
-  ai-news.py (fetch + keyword filter + dedup)              LLM cron prompt (summarize + search)
-        │                                    │                              │
-        └─────────────┬──────────────────┘                              │
-                         └──────────────────────────────────────────────────┘
-                                        ▼
-                              Curated digest (~50 articles)
+RSS (6) + HTML (8) + Hacker News + GitHub Trending + GitHub Ecosystem
+        │
+        ▼
+  ai-news.py (fetch + filter + dedup)
+        │
+        ▼
+  JSON output → LLM cron prompt (summarize + web_search 补充)
+        │
+        ▼
+  Curated digest (~50 items)
 ```
 
 ## Design principle: script extracts, LLM reasons

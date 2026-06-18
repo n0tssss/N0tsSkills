@@ -35,7 +35,10 @@ INCLUDE_KEYWORDS = [
     "moonshot", "skywork",
     # Tools/API
     "api", "sdk", "tool", "platform", "developer", "pricing", "cursor", "copilot",
-    "工具", "平台", "开发者", "定价",
+    "claude code", "openai codex", "opencode", "kilo code", "mimo code",
+    "windsurf", "aider", "continue", "cline", "roo code",
+    "mcp", "skill", "plugin", "extension", "agent", "agentic",
+    "工具", "平台", "开发者", "定价", "插件", "技能", "智能体",
     # Open source
     "open source", "open-source", "github", "huggingface",
     # Capabilities
@@ -289,6 +292,100 @@ def fetch_url(url):
             return resp.read().decode("utf-8", errors="replace")
     except Exception:
         return None
+
+
+# ── Hacker News ──
+def fetch_hackernews():
+    """从 HN Top Stories 中筛选 AI 相关内容"""
+    results = []
+    try:
+        top_ids = json.loads(fetch_url("https://hacker-news.firebaseio.com/v0/topstories.json") or "[]")
+    except Exception:
+        return results
+
+    # 只检查前 60 条（覆盖首页大部分内容）
+    ai_keywords = [
+        "ai", "llm", "gpt", "claude", "gemini", "openai", "anthropic", "deepseek",
+        "model", "agent", "coding", "cursor", "copilot", "mcp", "rag", "embed",
+        "fine-tun", "inference", "transformer", "diffusion", "token",
+        "人工智能", "大模型", "智能体", "代码", "编程",
+    ]
+
+    for story_id in top_ids[:60]:
+        item = github_api_get(f"https://hacker-news.firebaseio.com/v0/item/{story_id}.json")
+        if not item or item.get("type") != "story":
+            continue
+        title = item.get("title", "")
+        url = item.get("url", "")
+        if not title:
+            continue
+        # 标题匹配 AI 关键词
+        title_lower = title.lower()
+        if not any(kw in title_lower for kw in ai_keywords):
+            continue
+        if not url:
+            url = f"https://news.ycombinator.com/item?id={story_id}"
+        results.append({
+            "title": title,
+            "url": url,
+            "date": datetime.fromtimestamp(item.get("time", 0), tz=timezone.utc).isoformat(),
+            "source": "Hacker News",
+            "lang": "en",
+            "description": f"HN Score: {item.get('score', 0)} | Comments: {item.get('descendants', 0)}",
+            "stars": item.get("score", 0),
+        })
+    return results
+
+
+# ── GitHub Trending (AI/ML) ──
+def fetch_github_trending():
+    """搜索近 7 天新建的高星 AI 相关仓库"""
+    token = None
+    if os.path.exists(GITHUB_TOKEN_FILE):
+        try:
+            token = open(GITHUB_TOKEN_FILE).read().strip()
+        except Exception:
+            pass
+
+    results = []
+    now = datetime.now(timezone.utc)
+    week_ago = (now - timedelta(days=7)).strftime("%Y-%m-%d")
+
+    queries = [
+        f"AI coding tool created:>{week_ago}",
+        f"LLM agent framework created:>{week_ago}",
+        f"AI developer tool created:>{week_ago}",
+    ]
+
+    seen_ids = set()
+    for q in queries:
+        data = github_api_get(
+            f"https://api.github.com/search/repositories?q={urlquote(q)}&sort=stars&order=desc&per_page=10",
+            token
+        )
+        if not data:
+            continue
+        for item in data.get("items", []):
+            repo_id = item["id"]
+            if repo_id in seen_ids:
+                continue
+            seen_ids.add(repo_id)
+            stars = item.get("stargazers_count", 0)
+            if stars < 10:  # 过滤太冷门的
+                continue
+            results.append({
+                "title": f"🔥 {item['full_name']} ⭐{stars}",
+                "url": item["html_url"],
+                "date": item.get("created_at", ""),
+                "source": "GitHub/Trending",
+                "lang": "en",
+                "description": (item.get("description") or "")[:120],
+                "stars": stars,
+            })
+
+    # 按星数排序，取 top 10
+    results.sort(key=lambda x: x.get("stars", 0), reverse=True)
+    return results[:10]
 
 
 def parse_date(date_str):
@@ -563,6 +660,22 @@ def main():
 
     save_tracking(seen | session_urls, now)
 
+    # ── Hacker News (AI 相关) ──
+    hn_articles = fetch_hackernews()
+    hn_new = []
+    for art in hn_articles:
+        if art["url"] not in seen and art["url"] not in session_urls:
+            hn_new.append(art)
+            session_urls.add(art["url"])
+
+    # ── GitHub Trending (AI/ML 新工具) ──
+    trending_articles = fetch_github_trending()
+    trending_new = []
+    for art in trending_articles:
+        if art["url"] not in seen and art["url"] not in session_urls:
+            trending_new.append(art)
+            session_urls.add(art["url"])
+
     # ── GitHub ecosystem data ──
     github_articles = fetch_github_ecosystem()
     # Deduplicate against existing URLs
@@ -584,9 +697,13 @@ def main():
         "last_run": last_run.strftime("%Y-%m-%d %H:%M"),
         "count": len(all_articles),
         "github_count": len(github_new),
+        "hackernews_count": len(hn_new),
+        "trending_count": len(trending_new),
         "stats": stats,
         "articles": serializable,
         "github_ecosystem": github_new,
+        "hackernews": hn_new,
+        "github_trending": trending_new,
         "errors": errors,
         "web_search_keywords": WEB_SEARCH_KEYWORDS,
     }
