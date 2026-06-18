@@ -68,11 +68,6 @@ EXCLUDE_KEYWORDS = [
 # ── RSS Feeds ──
 RSS_FEEDS = [
     {"name": "OpenAI Blog",        "url": "https://openai.com/blog/rss.xml",                        "lang": "en", "max_articles": 8},
-    {"name": "Google AI Blog",     "url": "https://feeds.feedburner.com/blogspot/gJZg",             "lang": "en", "max_articles": 8},
-    {"name": "The Verge AI",       "url": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml", "lang": "en", "max_articles": 6},
-    {"name": "TechCrunch AI",      "url": "https://techcrunch.com/category/artificial-intelligence/feed/", "lang": "en", "max_articles": 6},
-    {"name": "VentureBeat AI",     "url": "https://venturebeat.com/category/ai/feed",               "lang": "en", "max_articles": 6},
-    {"name": "Hugging Face Papers","url": "https://huggingface.co/api/daily_papers",                 "lang": "en", "format": "json", "max_articles": 6},
 ]
 
 # ── HTML Blog / Doc Pages ──
@@ -199,43 +194,7 @@ def fetch_github_ecosystem():
                 "stars": item.get("stargazers_count", 0),
             })
 
-    # ── 4. Search: vibe coding ──
-    q = f"vibe coding created:>{thirty_days_ago}"
-    data = github_api_get(f"https://api.github.com/search/repositories?q={urlquote(q)}&sort=stars&order=desc&per_page=3", token)
-    if data:
-        for item in data.get("items", []):
-            results.append({
-                "title": f"{item['full_name']} ⭐{item['stargazers_count']}",
-                "url": item["html_url"],
-                "date": item.get("created_at", ""),
-                "source": "GitHub/VibeCoding",
-                "lang": "en",
-                "description": (item.get("description") or "")[:120],
-                "stars": item.get("stargazers_count", 0),
-            })
-
-    # ── 5. Search: system prompts ──
-    q = "system prompts leaks"
-    data = github_api_get(f"https://api.github.com/search/repositories?q={urlquote(q)}&sort=stars&order=desc&per_page=5", token)
-    if data:
-        seen_stars = set()
-        for item in data.get("items", []):
-            # Skip if already have a repo with similar star count (dedup)
-            stars = item.get("stargazers_count", 0)
-            if stars in seen_stars:
-                continue
-            seen_stars.add(stars)
-            results.append({
-                "title": f"{item['full_name']} ⭐{item['stargazers_count']}",
-                "url": item["html_url"],
-                "date": item.get("pushed_at", ""),
-                "source": "GitHub/Prompts",
-                "lang": "en",
-                "description": (item.get("description") or "")[:120],
-                "stars": item.get("stargazers_count", 0),
-            })
-
-    # ── 6. Commits: awesome-mcp-servers new additions ──
+    # ── 4. Commits: awesome-mcp-servers new additions ──
     commits = github_api_get(
         f"https://api.github.com/repos/punkpeye/awesome-mcp-servers/commits?per_page=30&since={seven_days_ago}T00:00:00Z",
         token
@@ -260,7 +219,7 @@ def fetch_github_ecosystem():
                     "stars": 0,
                 })
 
-    # ── 7. Commits: antigravity-awesome-skills updates ──
+    # ── 5. Commits: antigravity-awesome-skills updates ──
     commits = github_api_get(
         f"https://api.github.com/repos/sickn33/antigravity-awesome-skills/commits?per_page=10&since={seven_days_ago}T00:00:00Z",
         token
