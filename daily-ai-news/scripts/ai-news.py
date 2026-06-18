@@ -12,11 +12,15 @@ import sys
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
 from urllib.request import urlopen, Request
+from urllib.parse import quote as urlquote
 
 BEIJING_TZ = timezone(timedelta(hours=8))
 TRACKING_FILE = os.path.expanduser("~/.hermes/data/ai-news-seen.json")
 USER_AGENT = "Mozilla/5.0 (compatible; HermesAgent/1.0)"
 FETCH_TIMEOUT = 15
+
+# ── GitHub API config ──
+GITHUB_TOKEN_FILE = os.path.expanduser("~/.hermes/.github_token")
 
 # ── Include keywords ──
 INCLUDE_KEYWORDS = [
@@ -115,6 +119,167 @@ WEB_SEARCH_KEYWORDS = [
     "MiniMax 智谱GLM 通义千问 更新",
     "36kr 机器之心 量子位 AI模型",
 ]
+
+
+def github_api_get(url, token=None):
+    """Fetch GitHub API with optional auth token."""
+    headers = {
+        "User-Agent": "HermesAgent/1.0",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    if token:
+        headers["Authorization"] = f"token {token}"
+    try:
+        req = Request(url, headers=headers)
+        with urlopen(req, timeout=FETCH_TIMEOUT) as resp:
+            return json.loads(resp.read().decode("utf-8", errors="replace"))
+    except Exception:
+        return None
+
+
+def fetch_github_ecosystem():
+    """Fetch AI ecosystem data from GitHub API: new skills, MCP servers, rules, etc."""
+    token = None
+    if os.path.exists(GITHUB_TOKEN_FILE):
+        try:
+            token = open(GITHUB_TOKEN_FILE).read().strip()
+        except Exception:
+            pass
+
+    results = []
+    now = datetime.now(timezone.utc)
+    seven_days_ago = (now - timedelta(days=7)).strftime("%Y-%m-%d")
+    thirty_days_ago = (now - timedelta(days=30)).strftime("%Y-%m-%d")
+
+    # ── 1. Search: new Claude Code skills ──
+    q = f"claude code skills created:>{seven_days_ago}"
+    data = github_api_get(f"https://api.github.com/search/repositories?q={urlquote(q)}&sort=stars&order=desc&per_page=8", token)
+    if data:
+        for item in data.get("items", []):
+            results.append({
+                "title": f"{item['full_name']} ⭐{item['stargazers_count']}",
+                "url": item["html_url"],
+                "date": item.get("created_at", ""),
+                "source": "GitHub/Skills",
+                "lang": "en",
+                "description": (item.get("description") or "")[:120],
+                "stars": item.get("stargazers_count", 0),
+            })
+
+    # ── 2. Search: new Cursor rules ──
+    q = f"cursor rules created:>{seven_days_ago}"
+    data = github_api_get(f"https://api.github.com/search/repositories?q={urlquote(q)}&sort=stars&order=desc&per_page=5", token)
+    if data:
+        for item in data.get("items", []):
+            results.append({
+                "title": f"{item['full_name']} ⭐{item['stargazers_count']}",
+                "url": item["html_url"],
+                "date": item.get("created_at", ""),
+                "source": "GitHub/CursorRules",
+                "lang": "en",
+                "description": (item.get("description") or "")[:120],
+                "stars": item.get("stargazers_count", 0),
+            })
+
+    # ── 3. Search: AI agent frameworks ──
+    q = f"AI agent skills framework created:>{thirty_days_ago}"
+    data = github_api_get(f"https://api.github.com/search/repositories?q={urlquote(q)}&sort=stars&order=desc&per_page=5", token)
+    if data:
+        for item in data.get("items", []):
+            results.append({
+                "title": f"{item['full_name']} ⭐{item['stargazers_count']}",
+                "url": item["html_url"],
+                "date": item.get("created_at", ""),
+                "source": "GitHub/Agents",
+                "lang": "en",
+                "description": (item.get("description") or "")[:120],
+                "stars": item.get("stargazers_count", 0),
+            })
+
+    # ── 4. Search: vibe coding ──
+    q = f"vibe coding created:>{thirty_days_ago}"
+    data = github_api_get(f"https://api.github.com/search/repositories?q={urlquote(q)}&sort=stars&order=desc&per_page=3", token)
+    if data:
+        for item in data.get("items", []):
+            results.append({
+                "title": f"{item['full_name']} ⭐{item['stargazers_count']}",
+                "url": item["html_url"],
+                "date": item.get("created_at", ""),
+                "source": "GitHub/VibeCoding",
+                "lang": "en",
+                "description": (item.get("description") or "")[:120],
+                "stars": item.get("stargazers_count", 0),
+            })
+
+    # ── 5. Search: system prompts ──
+    q = "system prompts leaks"
+    data = github_api_get(f"https://api.github.com/search/repositories?q={urlquote(q)}&sort=stars&order=desc&per_page=5", token)
+    if data:
+        seen_stars = set()
+        for item in data.get("items", []):
+            # Skip if already have a repo with similar star count (dedup)
+            stars = item.get("stargazers_count", 0)
+            if stars in seen_stars:
+                continue
+            seen_stars.add(stars)
+            results.append({
+                "title": f"{item['full_name']} ⭐{item['stargazers_count']}",
+                "url": item["html_url"],
+                "date": item.get("pushed_at", ""),
+                "source": "GitHub/Prompts",
+                "lang": "en",
+                "description": (item.get("description") or "")[:120],
+                "stars": item.get("stargazers_count", 0),
+            })
+
+    # ── 6. Commits: awesome-mcp-servers new additions ──
+    commits = github_api_get(
+        f"https://api.github.com/repos/punkpeye/awesome-mcp-servers/commits?per_page=30&since={seven_days_ago}T00:00:00Z",
+        token
+    )
+    if commits:
+        for c in commits:
+            msg = c.get("commit", {}).get("message", "")
+            lower = msg.lower()
+            # Look for "add-xxx" pattern in merge commit messages
+            add_match = re.search(r"add-([a-z0-9_-]+)", lower)
+            if add_match:
+                server_name = add_match.group(1)
+                first_line = f"New: {server_name}"
+                sha = c.get("sha", "")[:8]
+                results.append({
+                    "title": f"MCP: {first_line}",
+                    "url": f"https://github.com/punkpeye/awesome-mcp-servers/commit/{sha}",
+                    "date": c.get("commit", {}).get("author", {}).get("date", ""),
+                    "source": "GitHub/MCP",
+                    "lang": "en",
+                    "description": first_line,
+                    "stars": 0,
+                })
+
+    # ── 7. Commits: antigravity-awesome-skills updates ──
+    commits = github_api_get(
+        f"https://api.github.com/repos/sickn33/antigravity-awesome-skills/commits?per_page=10&since={seven_days_ago}T00:00:00Z",
+        token
+    )
+    if commits:
+        skill_count = 0
+        for c in commits:
+            msg = c.get("commit", {}).get("message", "")
+            if "skill" in msg.lower() or "add" in msg.lower():
+                skill_count += 1
+        if skill_count > 0:
+            results.append({
+                "title": f"Antigravity Skills Registry updated ({skill_count} changes this week)",
+                "url": "https://github.com/sickn33/antigravity-awesome-skills",
+                "date": commits[0].get("commit", {}).get("author", {}).get("date", ""),
+                "source": "GitHub/Skills",
+                "lang": "en",
+                "description": "1494+ agentic skills for Claude Code, Cursor, Codex CLI, Gemini CLI",
+                "stars": 39000,
+            })
+
+    return results
 
 
 def fetch_url(url):
@@ -398,6 +563,15 @@ def main():
 
     save_tracking(seen | session_urls, now)
 
+    # ── GitHub ecosystem data ──
+    github_articles = fetch_github_ecosystem()
+    # Deduplicate against existing URLs
+    github_new = []
+    for art in github_articles:
+        if art["url"] not in seen and art["url"] not in session_urls:
+            github_new.append(art)
+            session_urls.add(art["url"])
+
     serializable = []
     for art in all_articles:
         a = dict(art)
@@ -409,8 +583,10 @@ def main():
         "fetch_time": now.strftime("%Y-%m-%d %H:%M"),
         "last_run": last_run.strftime("%Y-%m-%d %H:%M"),
         "count": len(all_articles),
+        "github_count": len(github_new),
         "stats": stats,
         "articles": serializable,
+        "github_ecosystem": github_new,
         "errors": errors,
         "web_search_keywords": WEB_SEARCH_KEYWORDS,
     }

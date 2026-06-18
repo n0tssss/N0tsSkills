@@ -406,9 +406,47 @@ hyperframes render --output rendered.mp4
 ---
 
 ## 工具 & 环境
-
-kimi-webbridge · HyperFrames · FFmpeg · 小米 MiMo TTS
+## 工具 & 环境
+kimi-webbridge · HyperFrames v0.6+ · FFmpeg · 小米 MiMo TTS
 Node.js ≥ 22 · FFmpeg · Python 3.x
+
+## HyperFrames 新功能（v0.6+）
+
+### 网站捕获
+```bash
+hyperframes capture https://example.com --output ./captures/
+```
+直接截取网站页面作为视频素材，自动处理滚动和动画。
+
+### 音乐节拍检测
+```bash
+hyperframes beats --input music.mp3
+```
+自动检测音乐节拍，生成beats.json，用于卡点动画。
+
+### 时间轴检查
+```bash
+hyperframes inspect
+```
+检查渲染后的视觉布局，发现问题。
+
+### 关键帧截图
+```bash
+hyperframes snapshot
+```
+捕获关键帧PNG截图，用于视觉验证。
+
+### 云端渲染
+```bash
+hyperframes cloud render
+```
+使用HeyGen云端渲染，无需本地Chrome/FFmpeg。
+
+### 性能基准测试
+```bash
+hyperframes benchmark
+```
+测试不同fps/质量配置的渲染速度和文件大小。
 
 ## 参考文件
 

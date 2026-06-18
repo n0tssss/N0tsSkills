@@ -75,8 +75,8 @@ def fetch_user_orgs():
 
 
 def fetch_user_events(username, date):
-    """获取用户今日的公开事件"""
-    url = f"{API_BASE}/users/{username}/events/public"
+    """获取用户今日的事件（包括私有仓库）"""
+    url = f"{API_BASE}/users/{username}/events"
     events = []
     page = 1
     headers = get_headers()
@@ -152,38 +152,54 @@ def fetch_repo_commits(username, org_names, date):
     session = get_session()
     repo_commits = {}
     bj_tz = timezone(timedelta(hours=8))
-    since = datetime.combine(date, datetime.min.time()).replace(tzinfo=bj_tz)
-    until = since + timedelta(days=1)
+    # 使用 UTC 时间（GitHub API 不支持带时区的 ISO 格式）
+    since_utc = datetime.combine(date, datetime.min.time()).strftime("%Y-%m-%dT00:00:00Z")
+    until_utc = (date + timedelta(days=1)).strftime("%Y-%m-%dT00:00:00Z")
     
-    repos_url = f"{API_BASE}/users/{username}/repos"
-    resp = requests.get(repos_url, headers=headers, params={"per_page": 100, "sort": "updated"})
+    # 使用 /user/repos 端点（需要认证，能返回私有仓库）
+    repos_url = f"{API_BASE}/user/repos"
+    resp = requests.get(repos_url, headers=headers, params={"per_page": 100, "sort": "updated", "affiliation": "owner", "direction": "desc"})
     user_repos = resp.json() if resp.status_code == 200 else []
     
     all_repos = []
+    cutoff_date = date - timedelta(days=7)
     for repo in user_repos:
-        all_repos.append({"name": repo["name"], "owner": username, "source": "personal"})
+        # 只保留最近 7 天更新的仓库
+        updated_at = repo.get("updated_at", "")
+        if updated_at:
+            repo_date = datetime.fromisoformat(updated_at.replace("Z", "+00:00")).date()
+            if repo_date >= cutoff_date:
+                all_repos.append({"name": repo["name"], "owner": username, "source": "personal"})
     
     for org_name in org_names:
         org_repos_url = f"{API_BASE}/orgs/{org_name}/repos"
-        resp = requests.get(org_repos_url, headers=headers, params={"per_page": 100, "sort": "updated"})
+        resp = requests.get(org_repos_url, headers=headers, params={"per_page": 100, "sort": "updated", "direction": "desc"})
         if resp.status_code == 200:
             for repo in resp.json():
-                all_repos.append({"name": repo["name"], "owner": org_name, "source": "org"})
+                # 只保留最近 7 天更新的仓库
+                updated_at = repo.get("updated_at", "")
+                if updated_at:
+                    repo_date = datetime.fromisoformat(updated_at.replace("Z", "+00:00")).date()
+                    if repo_date >= cutoff_date:
+                        all_repos.append({"name": repo["name"], "owner": org_name, "source": "org"})
     
-    for repo_info in all_repos[:40]:
+    print(f"检查最近 7 天更新的仓库: {len(all_repos)} 个")
+    
+    for repo_info in all_repos[:20]:  # 最多检查 20 个
         repo_name = repo_info["name"]
         owner = repo_info["owner"]
         
         commits_url = f"{API_BASE}/repos/{owner}/{repo_name}/commits"
         resp = session.get(commits_url, headers=headers, params={
-            "since": since.isoformat(),
-            "until": until.isoformat(),
-            "author": username,
+            "since": since_utc,
+            "until": until_utc,
             "per_page": 100
         })
         
         if resp.status_code == 200:
-            commits = resp.json()
+            all_commits = resp.json()
+            # 过滤：只保留该用户的提交（Git author name ≠ GitHub username）
+            commits = [c for c in all_commits if c.get("author", {}).get("login") == username]
             if commits:
                 commit_times = []
                 total_additions = 0

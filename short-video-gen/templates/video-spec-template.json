@@ -1,0 +1,79 @@
+{
+  "project": {
+    "name": "project-name",
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "duration": 40
+  },
+  "style": {
+    "theme": "cyberpunk",
+    "colors": {
+      "primary": "#00d4ff",
+      "secondary": "#1a1a2e",
+      "accent": "#ff4444",
+      "background": "#0a0a0a"
+    },
+    "font": {
+      "main": "system-ui",
+      "size": {
+        "title": 72,
+        "subtitle": 48,
+        "caption": 36
+      }
+    }
+  },
+  "scenes": [
+    {
+      "id": "scene-1",
+      "name": "场景名称",
+      "start": 0,
+      "duration": 4,
+      "background": "linear-gradient(135deg, #1a1a2e, #16213e)",
+      "elements": [
+        {
+          "type": "text",
+          "id": "title-1",
+          "content": "标题文字",
+          "position": { "x": "center", "y": "center" },
+          "style": {
+            "fontSize": 72,
+            "fontWeight": "bold",
+            "color": "white",
+            "textAlign": "center"
+          },
+          "animation": {
+            "enter": { "type": "scaleIn", "duration": 0.6, "delay": 0 },
+            "emphasis": { "type": "pulse", "duration": 0.5, "delay": 1 },
+            "exit": { "type": "blurOut", "duration": 0.4 }
+          }
+        },
+        {
+          "type": "text",
+          "id": "subtitle-1",
+          "content": "副标题文字",
+          "position": { "x": "center", "y": "bottom" },
+          "style": {
+            "fontSize": 48,
+            "color": "#aaaaaa",
+            "textAlign": "center"
+          },
+          "animation": {
+            "enter": { "type": "slideInUp", "duration": 0.5, "delay": 0.3 },
+            "exit": { "type": "fadeOut", "duration": 0.3 }
+          }
+        }
+      ]
+    }
+  ],
+  "audio": {
+    "enabled": false,
+    "file": "voiceover.wav",
+    "tts": {
+      "provider": "xiaomi-mimo",
+      "voice": "Chloe",
+      "text": "旁白文本",
+      "segments": []
+    }
+  }
+}
