@@ -98,15 +98,13 @@ GitHub API with auth token provides **structured, high-quality data** on AI ecos
 
 **Queries to run (in ai-news.py):**
 
-**6 search queries + 2 commit tracking (in `fetch_github_ecosystem()`):**
+**3 search queries + 2 commit tracking (in `fetch_github_ecosystem()`):**
 
 | Query | Source Label | Per Page | Purpose |
 |-------|-------------|----------|---------|
 | `claude code skills created:>7d` | GitHub/Skills | 8 | New Claude Code skill repos |
 | `cursor rules created:>7d` | GitHub/CursorRules | 5 | New Cursor/Windsurf rules |
 | `AI agent skills framework created:>30d` | GitHub/Agents | 5 | New agent frameworks |
-| `vibe coding created:>30d` | GitHub/VibeCoding | 3 | Vibe coding paradigm |
-| `system prompts leaks` | GitHub/Prompts | 5 | System prompt collections (no date filter) |
 | awesome-mcp-servers commits (7d) | GitHub/MCP | 30 commits | New MCP server additions via "add-xxx" pattern |
 | antigravity-awesome-skills commits (7d) | GitHub/Skills | 10 commits | Skills registry updates |
 
@@ -127,21 +125,30 @@ GitHub API with auth token provides **structured, high-quality data** on AI ecos
 - **Per-source limits**: Max 8-10 articles per source
 - **Target**: ~50 articles total (down from 1200+ unfiltered)
 
-### Sources (14 total)
+### Sources (v4: refined for quality)
 
-**RSS Feeds (6)**
-| Source | Max | Focus |
-|--------|-----|-------|
-| OpenAI Blog | 10 | GPT releases, API updates |
-| Google AI Blog | 10 | Gemini, PaLM updates |
-| The Verge AI | 8 | Industry news |
-| TechCrunch AI | 8 | Startup/product launches |
-| VentureBeat AI | 8 | Enterprise AI |
-| Hugging Face Papers | 8 | Daily papers |
+**RSS (1)**
+| Source | Focus |
+|--------|-------|
+| OpenAI Blog | GPT releases, API updates |
 
-**HTML Blogs (9)**
-| Source | URL | Type | Focus |
-|--------|-----|------|-------|
+**HTML Blogs (8)**
+| Source | Type |
+|--------|------|
+| Anthropic | Claude updates |
+| Meta AI | Llama releases |
+| Mistral | Model releases |
+| MiniMax | Chinese vendor |
+| Qwen | Chinese vendor |
+| 小米MiMo | Chinese vendor |
+| DeepSeek | Chinese vendor |
+| 智谱AI | Chinese vendor |
+
+**Hacker News** — AI-related discussions from Top 60 stories
+
+**GitHub Trending** — New AI tools/frameworks (7-day window, 10+ stars)
+
+**GitHub Ecosystem** — Claude Code Skills · Cursor Rules · MCP Servers commits
 | Anthropic | anthropic.com/news | blog | Claude releases |
 | Meta AI | ai.meta.com/blog | blog | Llama releases |
 | Mistral | mistral.ai/news | blog | Mistral releases |
@@ -286,6 +293,15 @@ OpenAI's RSS feed returns 900+ articles. We limit to 10 and filter by time (72h)
 
 ### User preference: model updates > commercial news
 User explicitly wants model release/update news, NOT commercial partnerships, enterprise deals, or expansion announcements. Keep exclude keywords tight on business/political content.
+
+### Source curation philosophy (v4)
+User asked "有什么没用的来源吗？" — we removed 7 low-value sources:
+- **Removed**: The Verge AI, TechCrunch AI, VentureBeat AI (mainstream tech media, too much noise/funding news)
+- **Removed**: Google AI Blog, Hugging Face Papers (research-focused, not practical tools)
+- **Removed**: GitHub Vibe Coding, GitHub System Prompts (trendy but low-quality projects)
+- **Added**: Hacker News (tech community hot discussions), GitHub Trending (new AI tools)
+- **Keep**: Official vendor blogs (OpenAI, Anthropic, etc.), Chinese vendor blogs (MiniMax, Qwen, MiMo, DeepSeek, 智谱)
+- **Principle**: Sources should provide actionable info (new tools, model releases, practical workflows), not business news or academic papers
 
 ### Don't miss important releases when organizing
 When organizing articles by importance, scan ALL articles first before writing the summary. Don't just pick from the top of the list. Important releases like MiniMax M3 can be buried in the middle of a source's article list.

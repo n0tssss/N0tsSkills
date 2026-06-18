@@ -339,18 +339,127 @@ def render_card(data: dict, mode: str, output_path: str, city: str):
     return output_path
 
 
+def render_from_translated(translated, output_path):
+    """从 AI 翻译后的 JSON 数据渲染卡片"""
+    city = translated.get("city", "")
+    date_text = translated.get("date_text", "")
+    weekday = translated.get("weekday", "")
+    max_temp = translated.get("max_temp", 0)
+    min_temp = translated.get("min_temp", 0)
+    avg_temp = translated.get("avg_temp", 0)
+    weather_zh = translated.get("weather_zh", "晴")
+    wind = translated.get("wind", "")
+    humidity = translated.get("humidity", 0)
+    sunrise = translated.get("sunrise", "")
+    sunset = translated.get("sunset", "")
+    rest_text = translated.get("rest_text", "")
+    hourly = translated.get("hourly", [])
+
+    # 天气 class 和 emoji
+    weather_class = get_weather_class(weather_zh)
+    main_emoji = get_emoji(weather_zh)
+
+    # 心情
+    mood = get_mood(min_temp, max_temp, weather_zh)
+
+    # 逐时段
+    hourly_items = []
+    for h in hourly:
+        is_now = h.get("is_now", False)
+        now_class = " now" if is_now else ""
+        hourly_items.append(f'''
+          <div class="hour-item{now_class}">
+            <div class="hour-time">{h["hour"]}</div>
+            <div class="hour-emoji">{h.get("emoji", "🌤️")}</div>
+            <div class="hour-temp">{h["temp"]}°</div>
+            <div class="hour-humidity">💧{h["humidity"]}%</div>
+          </div>''')
+
+    # 生活建议
+    tips = get_clothing_tips(min_temp, max_temp, weather_zh, humidity, int(wind.split()[-1].replace("km/h", "")) if wind else 0)
+    tips_html = ""
+    if tips:
+        tips_items = "".join(f'<div class="tip-item">{tip}</div>' for tip in tips)
+        tips_html = f'''
+  <div class="tips">
+    <div class="tips-title">💡 生活建议</div>
+    {tips_items}
+  </div>'''
+
+    # 倒计时
+    countdown_html = ""
+    if rest_text:
+        countdown_html = f'<div class="countdown">📅 {rest_text}</div>'
+
+    # 读取模板
+    template_path = Path(__file__).parent.parent / "templates" / "weather_card.html"
+    template = template_path.read_text(encoding="utf-8")
+
+    # 填充模板
+    html = template.replace("${weather_class}", weather_class)
+    html = html.replace("${city}", city)
+    html = html.replace("${main_emoji}", main_emoji)
+    html = html.replace("${date_text}", date_text)
+    html = html.replace("${weekday}", weekday)
+    html = html.replace("${special_note_html}", countdown_html)
+    html = html.replace("${weather_desc}", weather_zh)
+    html = html.replace("${max_temp}", str(max_temp))
+    html = html.replace("${min_temp}", str(min_temp))
+    html = html.replace("${avg_temp}", str(avg_temp))
+    html = html.replace("${mood}", mood)
+    html = html.replace("${hourly_items}", "".join(hourly_items))
+    html = html.replace("${tips_html}", tips_html)
+    html = html.replace("${wind}", wind)
+    html = html.replace("${humidity}", str(humidity))
+    html = html.replace("${sunrise}", sunrise)
+    html = html.replace("${sunset}", sunset)
+
+    # 截图
+    import tempfile
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as f:
+        f.write(html)
+        tmp_path = f.name
+
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            page = browser.new_page(viewport={'width': 390, 'height': 800}, device_scale_factor=2)
+            page.goto(f'file://{tmp_path}')
+            page.wait_for_timeout(500)
+            height = int(page.evaluate('document.body.scrollHeight'))
+            page.set_viewport_size({'width': 390, 'height': height})
+            page.wait_for_timeout(200)
+            page.screenshot(path=output_path, clip={'x': 0, 'y': 0, 'width': 390, 'height': height})
+            browser.close()
+    finally:
+        os.unlink(tmp_path)
+
+    return output_path
+
+
 def main():
     parser = argparse.ArgumentParser(description="天气卡片渲染")
-    parser.add_argument("--city", required=True, help="城市名（必填）")
+    parser.add_argument("--city", help="城市名")
     parser.add_argument("--mode", choices=["today", "tomorrow"], default="tomorrow")
     parser.add_argument("--output", default=os.path.expanduser("~/.hermes/cache/weather_card.png"))
+    parser.add_argument("--data-file", help="从 JSON 文件读取翻译后的数据（跳过网络请求）")
     args = parser.parse_args()
 
     os.makedirs(os.path.dirname(args.output), exist_ok=True)
 
     try:
-        data = fetch_weather(args.city)
-        output = render_card(data, args.mode, args.output, args.city)
+        if args.data_file:
+            # 从 JSON 文件读取翻译后的数据
+            with open(args.data_file, 'r', encoding='utf-8') as f:
+                translated = json.load(f)
+            # 用翻译后的数据构造 wttr.in 格式，直接渲染
+            output = render_from_translated(translated, args.output)
+        else:
+            if not args.city:
+                parser.error("--city is required when --data-file is not used")
+            data = fetch_weather(args.city)
+            output = render_card(data, args.mode, args.output, args.city)
         print(output)
     except Exception as e:
         print(f"❌ 渲染失败: {e}", file=sys.stderr)
