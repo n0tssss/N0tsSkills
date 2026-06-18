@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=390">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { overflow: hidden; width: 390px; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'PingFang SC', sans-serif;
+  width: 390px;
+  min-height: 200px;
+  background: var(--bg-gradient);
+  color: #fff;
+  padding: 20px 18px;
+  position: relative;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 天气背景 */
+body.sunny {
+  --bg-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  --card-bg: rgba(255,255,255,0.2);
+  --text-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.2);
+}
+body.clear {
+  --bg-gradient: linear-gradient(135deg, #0c1445 0%, #1a237e 50%, #283593 100%);
+  --card-bg: rgba(255,255,255,0.12);
+  --text-shadow: 0 1px 3px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.4);
+}
+body.cloudy {
+  --bg-gradient: linear-gradient(135deg, #8e9eab 0%, #c9d6de 50%, #eef2f3 100%);
+  --card-bg: rgba(255,255,255,0.35);
+  --text-shadow: 0 1px 2px rgba(255,255,255,0.8), 0 2px 8px rgba(0,0,0,0.15);
+  color: #1a1a2e;
+}
+body.partly_cloudy {
+  --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --card-bg: rgba(255,255,255,0.2);
+  --text-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.2);
+}
+body.rainy {
+  --bg-gradient: linear-gradient(135deg, #4b6cb7 0%, #182848 100%);
+  --card-bg: rgba(255,255,255,0.15);
+  --text-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.3);
+}
+body.heavy_rain {
+  --bg-gradient: linear-gradient(135deg, #232526 0%, #414345 100%);
+  --card-bg: rgba(255,255,255,0.12);
+  --text-shadow: 0 1px 3px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.4);
+}
+body.thunderstorm {
+  --bg-gradient: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+  --card-bg: rgba(255,255,255,0.12);
+  --text-shadow: 0 1px 3px rgba(0,0,0,0.6), 0 4px 12px rgba(0,0,0,0.5);
+}
+body.snow {
+  --bg-gradient: linear-gradient(135deg, #e6e9f0 0%, #eef1f5 100%);
+  --card-bg: rgba(255,255,255,0.5);
+  --text-shadow: 0 1px 2px rgba(255,255,255,0.8), 0 2px 8px rgba(0,0,0,0.12);
+  color: #1a1a2e;
+}
+body.fog {
+  --bg-gradient: linear-gradient(135deg, #bdc3c7 0%, #606c88 50%, #3f4c6b 100%);
+  --card-bg: rgba(255,255,255,0.18);
+  --text-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.3);
+}
+
+/* 顶部装饰圆 */
+body::before {
+  content: '';
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  top: -50px;
+  right: -30px;
+}
+/* 底部装饰圆（不溢出） */
+body::after {
+  content: '';
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+  bottom: 10px;
+  left: -15px;
+}
+
+/* 主卡片 */
+.card {
+  position: relative;
+  z-index: 1;
+}
+
+/* 头部：城市+日期 */
+.header {
+  margin-bottom: 10px;
+}
+.city {
+  font-size: 22px;
+  font-weight: 700;
+  text-shadow: var(--text-shadow);
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.date {
+  font-size: 13px;
+  opacity: 0.9;
+  margin-top: 2px;
+  text-shadow: var(--text-shadow);
+}
+
+/* 主天气区 */
+.main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 12px 0;
+  padding: 12px 0;
+  border-top: 1px solid rgba(255,255,255,0.15);
+  border-bottom: 1px solid rgba(255,255,255,0.15);
+}
+.main-left {
+  flex: 1;
+}
+.weather-desc {
+  font-size: 18px;
+  font-weight: 600;
+  text-shadow: var(--text-shadow);
+}
+.temp-range {
+  font-size: 14px;
+  opacity: 0.9;
+  margin-top: 4px;
+  text-shadow: var(--text-shadow);
+}
+.main-right {
+  text-align: right;
+}
+.temp-now {
+  font-size: 56px;
+  font-weight: 300;
+  line-height: 1;
+  text-shadow: var(--text-shadow);
+}
+.temp-unit {
+  font-size: 20px;
+  font-weight: 400;
+  vertical-align: super;
+}
+.mood {
+  font-size: 24px;
+  margin-top: 2px;
+}
+
+/* 逐时段预报 */
+.hourly {
+  margin: 10px 0;
+  padding: 8px 0;
+  border-top: 1px solid rgba(255,255,255,0.12);
+}
+.hourly-title {
+  font-size: 11px;
+  opacity: 0.85;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-shadow: var(--text-shadow);
+}
+.hourly-grid {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+}
+.hour-item {
+  flex: 1;
+  text-align: center;
+  padding: 8px 2px;
+  border-radius: 12px;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
+}
+.hour-item.now {
+  background: rgba(255,255,255,0.35);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.hour-time {
+  font-size: 10px;
+  opacity: 0.8;
+  text-shadow: var(--text-shadow);
+}
+.hour-emoji {
+  font-size: 16px;
+  margin: 4px 0;
+}
+.hour-temp {
+  font-size: 13px;
+  font-weight: 600;
+  text-shadow: var(--text-shadow);
+}
+.hour-humidity {
+  font-size: 9px;
+  opacity: 0.7;
+  margin-top: 2px;
+  text-shadow: var(--text-shadow);
+}
+
+/* 生活建议 */
+.tips {
+  margin: 10px 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
+}
+.tips-title {
+  font-size: 11px;
+  opacity: 0.85;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-shadow: var(--text-shadow);
+}
+.tip-item {
+  font-size: 13px;
+  line-height: 1.6;
+  opacity: 0.95;
+  text-shadow: var(--text-shadow);
+}
+
+/* 底部信息 */
+.footer {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255,255,255,0.12);
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  opacity: 0.9;
+}
+.footer-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  text-shadow: var(--text-shadow);
+}
+
+/* 节假日/周末提示 */
+.special-note {
+  background: rgba(255,255,255,0.25);
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 10px;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  text-shadow: var(--text-shadow);
+}
+
+/* 倒计时 */
+.countdown {
+  background: rgba(255,255,255,0.2);
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  margin-bottom: 10px;
+  text-align: center;
+  text-shadow: var(--text-shadow);
+}
+
+/* 来源标识 */
+.source {
+  position: absolute;
+  bottom: 6px;
+  right: 10px;
+  font-size: 9px;
+  opacity: 0.4;
+  color: inherit;
+}
+</style>
+</head>
+<body class="${weather_class}">
+<div class="card">
+  <div class="header">
+    <div class="city">${city} ${main_emoji}</div>
+    <div class="date">${date_text} ${weekday}</div>
+  </div>
+
+  ${special_note_html}
+
+  <div class="main">
+    <div class="main-left">
+      <div class="weather-desc">${weather_desc}</div>
+      <div class="temp-range">↑ ${max_temp}° ↓ ${min_temp}°</div>
+    </div>
+    <div class="main-right">
+      <div class="temp-now">${avg_temp}<span class="temp-unit">°</span></div>
+      <div class="mood">${mood}</div>
+    </div>
+  </div>
+
+  <div class="hourly">
+    <div class="hourly-title">⏰ 逐时段预报</div>
+    <div class="hourly-grid">
+      ${hourly_items}
+    </div>
+  </div>
+
+  ${tips_html}
+
+  <div class="footer">
+    <div class="footer-item">🌬️ ${wind}</div>
+    <div class="footer-item">💧 ${humidity}%</div>
+    <div class="footer-item">🌅 ${sunrise}</div>
+    <div class="footer-item">🌇 ${sunset}</div>
+  </div>
+</div>
+
+<div class="source">数据来源 wttr.in</div>
+</body>
+</html>
